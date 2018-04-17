@@ -9,3 +9,5 @@ We decided on a general setup. Led, sample, and detector will be in the plane of
 We devided the labour and designed an outer case for the MC, the electronics, and the sampleholder. And we designed a Sample holder that secures a short distances between led, sample and detector.
 
 We did some crude ray tracing calculations and found that the lens maybe is not neccesary when the detector is close to the sample.
+
+
