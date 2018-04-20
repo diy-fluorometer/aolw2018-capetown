@@ -14,5 +14,5 @@ SDA -> D2
 
 * Control the device using a mini-HTTP server
 * Added test endpoints `/test/start` and `/test/stop` for initial measurements.
-  * `/test/start/` will turn on the blue LED, and start logging measurements to the serial console, in the format <time-in-millis>\\t<run-name>\\t<sequence-in-run>\\t<value>
+  * `/test/start/` will turn on the blue LED, and start logging measurements to the serial console, in the format \<time-in-millis\>\\t\<run-name\>\\t\<sequence-in-run\>\\t\<value\>
   * `/test/stop` will make the device stop taking measurements and turn of the LED
