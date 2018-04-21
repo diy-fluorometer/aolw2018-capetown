@@ -9,3 +9,10 @@
 The default pins are defined in variants/nodemcu/pins_arduino.h as SDA=4 and SCL=5, but those are not pins number but GPIO number, so since the pins are D1=5 and D2=4.
 SCL -> D1
 SDA -> D2
+
+# Modifications to the FluoroControl code
+
+* Control the device using a mini-HTTP server
+* Added test endpoints `/test/start` and `/test/stop` for initial measurements.
+  * `/test/start/` will turn on the blue LED, and start logging measurements to the serial console, in the format \<time-in-millis\>\\t\<run-name\>\\t\<sequence-in-run\>\\t\<value\>
+  * `/test/stop` will make the device stop taking measurements and turn of the LED
