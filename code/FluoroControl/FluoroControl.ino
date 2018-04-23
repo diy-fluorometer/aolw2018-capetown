@@ -6,6 +6,11 @@
 #include <Adafruit_Sensor.h>
 #include "Adafruit_TSL2591.h"
 
+#include "FluoroMeasurement.h"
+#include "FluoroRun.h"
+#include "FluoroHttp.h"
+#include "FluoroDevice.h"
+
 #include <ESP8266WiFi.h>
 
 // When using Arduino Uno:
@@ -20,11 +25,11 @@
 // Vin to 3.3-5V
 // GND to GND
 
-#define DEBUG 0
-#define BLUE_LED 4
-
+#define DEBUG 1
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591); // pass in a number for the sensor identifier (for your use later)
 bool sensor_found = false;
+
+Run current_run;
 
 void configure_sensor(void);
 void display_sensor_details(void);
@@ -34,7 +39,6 @@ int32_t raw_read(uint8_t gain);
 void stop_measurement();
 void process_http();
 void calibrate(uint8_t ref);
-int measure();
 
 const char* ssid     = "Fluoro";
 const char* password = "VerySecure";
@@ -43,19 +47,7 @@ const char* password = "VerySecure";
 WiFiServer server(80);
 
 // Variable to store the HTTP request
-String header;
-
-// Auxiliar variables to store the current output state
-String output5State = "off";
-String output4State = "off";
-
-// Assign output variables to GPIO pins
-const int output5 = 5;
-const int output4 = 4;
-
 boolean ap_running = false;
-
-
 
 void setup(void) 
 {
@@ -78,17 +70,16 @@ void setup(void)
     display_sensor_details();
     configure_sensor();
     
-//    pinMode(BLUE_LED, OUTPUT);
+    pinMode(BLUE_LED_PIN, OUTPUT);
+    digitalWrite(BLUE_LED_PIN, LOW);
+
+    current_run.idx = 0;
+    current_run.active = true;
   } 
   else {
     Serial.println("No sensor found ... check your wiring?");
   }
 }
-
-#define ERR_NO_SENSOR         -1
-#define ERR_INVALID_PARAMETER -2
-#define ERR_OVERFLOW          -3
-#define ERR_NOT_CALIBRATED    -4
 
 bool led_status = 0;
 
@@ -97,225 +88,182 @@ bool led_status = 0;
 #define TSL2591_GMED_FACTOR    25
 #define TSL2591_GLOW_FACTOR     1
 
-#define REF1  1
-#define REF2  2
-
-int ref1 = -1; // Reference 1 for calibration
-int ref2 = -1; // Reference 2 for calibration
-
 bool doMeasure = false;
 String sampleName;
 long numRep = 0;
 long repCount = 0;
 
-int32_t last_value = 0;
+// Takes a measurement and returns a Measurement object with all the right
+// values filled in.
+// If there is an error, the Measurement object will have is_valid set to false and
+// its error field set to the appropriate error code.
+//
+// The routine runs through all four possible gain settings, from most sensitive
+// to least sensitive. This order makes sense in the context of fluorescence measurement,
+// since usually, there will be very little light to work with.
+
+void take_measurement() {
+  uint32_t timestamp;
+
+  if (current_run.idx >= MAX_MEASUREMENTS) {
+#if DEBUG
+    Serial.println("Done taking measurements");
+#endif
+//    current_run.active = false;
+    current_run.idx = 0;
+//    return;
+  }
+
+#if DEBUG
+  Serial.print("Taking measurement #"); Serial.println(current_run.idx);
+#endif
+
+  // Turn on the blue light source
+  digitalWrite(BLUE_LED_PIN, HIGH);
+  
+  int32_t v = raw_read(TSL2591_GAIN_MAX);
+  timestamp = millis();
+  current_run.m[current_run.idx].timestamp = timestamp;
+  current_run.m[current_run.idx].value = v;
+  if (v < 0) {
+    if (v == ERR_NO_SENSOR ||
+        v == ERR_INVALID_PARAMETER) {
+      current_run.m[current_run.idx].is_valid = false;
+      current_run.idx++;
+      return;        
+    } else {
+#if DEBUG
+      Serial.println("Falling through from MAX to HIGH");
+#endif
+      // Overflow. Fall through and try again with a different gain setting.
+    }
+  } else {
+    // Good, we got a useable value.
+#if DEBUG
+    Serial.print("MAX: ");
+    Serial.println(v);
+#endif
+    current_run.m[current_run.idx].is_valid = true;
+    current_run.idx++;
+    return;
+  }
+
+
+  v = raw_read(TSL2591_GAIN_HIGH);
+  timestamp = millis();
+  current_run.m[current_run.idx].timestamp = timestamp;
+  current_run.m[current_run.idx].value = v;
+  if (v < 0) {
+    if (v == ERR_NO_SENSOR ||
+        v == ERR_INVALID_PARAMETER) {
+      current_run.m[current_run.idx].is_valid = false;
+      current_run.idx++;
+      return;        
+    } else {
+#if DEBUG
+      Serial.println("Falling through from HIGH to MED");
+#endif
+      // Overflow. Fall through and try again with a different gain setting.
+    }
+  } else {
+    // Good, we got a useable value.
+    // Adjust it for gain factor so we end up with a single scale for all values.
+#if DEBUG
+    Serial.print("HIGH: "); Serial.print(v); Serial.print(" ");
+#endif
+    v *= (TSL2591_GMAX_FACTOR / TSL2591_GHIGH_FACTOR);
+#if DEBUG
+    Serial.println(v);
+#endif
+    current_run.m[current_run.idx].is_valid = true;
+    current_run.m[current_run.idx].value = v;
+    current_run.idx++;
+    return;
+  }
+
+  v = raw_read(TSL2591_GAIN_MED);
+  timestamp = millis();
+  current_run.m[current_run.idx].timestamp = timestamp;
+  current_run.m[current_run.idx].value = v;
+  if (v < 0) {
+    if (v == ERR_NO_SENSOR ||
+        v == ERR_INVALID_PARAMETER) {
+      current_run.m[current_run.idx].is_valid = false;
+      current_run.idx++;
+      return;        
+    } else {
+#if DEBUG
+      Serial.println("Falling through from MED to LOW");        
+#endif
+      // Overflow. Fall through and try again with a different gain setting.
+    }
+  } else {
+    // Good, we got a useable value.
+    // Adjust it for gain factor so we end up with a single scale for all values.
+#if DEBUG
+    Serial.print("MED: "); Serial.print(v); Serial.println(" ");
+#endif
+    v *= (TSL2591_GHIGH_FACTOR / TSL2591_GMED_FACTOR);
+#if DEBUG
+    Serial.println(v);
+#endif
+    current_run.m[current_run.idx].is_valid = true;
+    current_run.m[current_run.idx].value = v;
+    current_run.idx++;
+    return;
+  }
+
+  v = raw_read(TSL2591_GAIN_LOW);
+  timestamp = millis();  
+  current_run.m[current_run.idx].timestamp = timestamp;
+  current_run.m[current_run.idx].value = v;
+  if (v < 0) {
+    if (v == ERR_NO_SENSOR ||
+        v == ERR_INVALID_PARAMETER) {
+      current_run.m[current_run.idx].is_valid = false;
+      current_run.idx++;
+      return;        
+    } else {
+#if DEBUG
+      Serial.println("Already at low -> too much light");
+#endif
+      // We are already at the lowest gain setting. If we still have an invalid value,
+      // it likely means that there is too much light for our sensor.
+      current_run.m[current_run.idx].is_valid = false;
+      current_run.m[current_run.idx].value = ERR_OUT_OF_RANGE;
+      current_run.idx++;
+      return;
+    }
+  } else {
+    // Good, we got a useable value.
+    // Adjust it for gain factor so we end up with a single scale for all values.
+#if DEBUG
+    Serial.print("LOW: "); Serial.print(v); Serial.println(" ");
+#endif
+    v *= (TSL2591_GMED_FACTOR / TSL2591_GLOW_FACTOR);
+#ifdef DEBUG
+    Serial.println(v);
+#endif    
+    current_run.m[current_run.idx].is_valid = true;
+    current_run.m[current_run.idx].value = v;
+    current_run.idx++;
+    return;
+  }  
+}
 
 void loop(void) 
 {
-  process_http();
-   
+  process_http(&server, &current_run);
   if (sensor_found) {
-    int32_t v = raw_read(TSL2591_GAIN_MAX);
-    if (v < 0) {
-      if (v == ERR_NO_SENSOR) {
-        Serial.println("Error reading sensor: No TSL2591 sensor present");
-        return;        
-      } else if (v == ERR_INVALID_PARAMETER) {
-        Serial.println("Error reading sensor: Invalid gain parameter");
-        return;
-      } else {
- #if DEBUG
-        Serial.println("Falling through from MAX to HIGH");
- #endif
-        // Overflow. Fall through and try again with a different gain setting.
-      }
-    } else {
-      // Good, we got a useable value.
-#if DEBUG
-      Serial.print("MAX: ");
-#endif
-      Serial.println(v);
-      last_value = v;
-      return;
+    if (current_run.active) {
+      take_measurement();
     }
-
-    v = raw_read(TSL2591_GAIN_HIGH);
-    if (v < 0) {
-      if (v == ERR_NO_SENSOR) {
-        Serial.println("Error reading sensor: No TSL2591 sensor present");
-        return;        
-      } else if (v == ERR_INVALID_PARAMETER) {
-        Serial.println("Error reading sensor: Invalid gain parameter");
-        return;
-      } else {
-#if DEBUG
-        Serial.println("Falling through from HIGH to MED");
-#endif
-        // Overflow. Fall through and try again with a different gain setting.
-      }
-    } else {
-      // Good, we got a useable value.
-      // Adjust it for gain factor so we end up with a single scale for all values.
-#if DEBUG
-      Serial.print("HIGH: "); Serial.print(v); Serial.print(" ");
-#endif
-      v *= (TSL2591_GMAX_FACTOR / TSL2591_GHIGH_FACTOR);
-      Serial.println(v);
-      last_value = v;
-      return;
-    }
-
-    v = raw_read(TSL2591_GAIN_MED);
-    if (v < 0) {
-      if (v == ERR_NO_SENSOR) {
-        Serial.println("Error reading sensor: No TSL2591 sensor present");
-        return;        
-      } else if (v == ERR_INVALID_PARAMETER) {
-        Serial.println("Error reading sensor: Invalid gain parameter");
-        return;
-      } else {
-#if DEBUG
-        Serial.println("Falling through from MED to LOW");        
-#endif
-        // Overflow. Fall through and try again with a different gain setting.
-      }
-    } else {
-      // Good, we got a useable value.
-      // Adjust it for gain factor so we end up with a single scale for all values.
-#if DEBUG
-      Serial.print("MED: "); Serial.print(v); Serial.println(" ");
-#endif
-      v *= (TSL2591_GHIGH_FACTOR / TSL2591_GMED_FACTOR);
-      Serial.println(v);
-      last_value = v;
-      return;
-    }
-
-    v = raw_read(TSL2591_GAIN_LOW);
-    if (v < 0) {
-      if (v == ERR_NO_SENSOR) {
-        Serial.println("Error reading sensor: No TSL2591 sensor present");
-        return;        
-      } else if (v == ERR_INVALID_PARAMETER) {
-        Serial.println("Error reading sensor: Invalid gain parameter");
-        return;
-      } else {
-#if DEBUG
-        Serial.println("Already at low -> not enough light");
-#endif
-        // Overflow. Fall through and try again with a different gain setting.
-      }
-    } else {
-      // Good, we got a useable value.
-      // Adjust it for gain factor so we end up with a single scale for all values.
-#if DEBUG
-      Serial.print("LOW: "); Serial.print(v); Serial.println(" ");
-#endif
-      v *= (TSL2591_GMED_FACTOR / TSL2591_GLOW_FACTOR);
-      Serial.println(v);
-      last_value = v;
-      return;
-    }  
   } else {
     // If no sensor was found, just blink the LED to signal this
     digitalWrite(LED_BUILTIN, led_status);
     led_status  = (led_status + 1) % 2;
     delay(500);
   }  
-}
-
-void calibrate(uint8_t ref) {
-  // TODO implement properly
-  if (ref == REF1) {
-    ref1 = 100;
-  } else if (ref == REF2) {
-    ref2 = 1000;
-  }
-}
-
-int measure(void) {
-  if (ref1 == -1 || ref2 == -1) {
-    return ERR_NOT_CALIBRATED;
-  }
-}
-
-// TODO separate out the webpage returned
-
-void process_http() {
-  WiFiClient client = server.available();   // Listen for incoming clients
-  if (client) {                             // If a new client connects,
-    Serial.println("New Client.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    String message = "";
-    while (client.connected()) {            // loop while the client's connected
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-
-            if (header.indexOf("GET /calibrate/1") >= 0) {
-              Serial.println("Calibrate - Ref1");
-              calibrate(REF1);
-              message = "Reference point 1 was set";
-            } else if (header.indexOf("GET /calibrate/2") >= 0) {
-              Serial.println("Calibrate - Ref2");
-              calibrate(REF2);
-              message = "Reference point 2 was set";
-            } else if (header.indexOf("GET /measure") >= 0) {
-              Serial.println("Take measurement");
-              int result = measure();
-              if (result == ERR_NOT_CALIBRATED) {
-                message = "At least one reference point is not set. Please calibrate the device first.";
-              }
-            }
-            
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
-            // Feel free to change the background-color and font-size attributes to fit your preferences
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 20px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #77878A;}</style></head>");
-            
-            // Web Page Heading
-            client.println("<body><h1>Fluorometer</h1>");
-            
-            client.println("<p>" + message + "</p>");
-            client.print("<p>Last light intensity value read: "); client.print(last_value); client.println("</p>");
-            client.println("<p><a href=\"/calibrate/1\"><button class=\"button\">Calibrate - Ref1</button></a></p>");
-            client.println("<p><a href=\"/calibrate/2\"><button class=\"button\">Calibrate - Ref2</button></a></p>");
-            client.println("<p><a href=\"/measure\"><button class=\"button\">Take measurement</button></a></p>");
-            client.println("</body></html>");
-            
-            // The HTTP response ends with another blank line
-            client.println();
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-  }           
 }
 
 /**************************************************************************/
@@ -460,6 +408,6 @@ void stop_measurement() {
   sampleName = "";
   numRep = 0;
   repCount = 0;
-//  digitalWrite(BLUE_LED, LOW);
+  digitalWrite(BLUE_LED_PIN, LOW);
 }
 
