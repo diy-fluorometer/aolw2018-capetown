@@ -1,4 +1,6 @@
 # 23.04.2018
+# NOTE: THIS IS INVALID DATA. There was a bug in the code where I was messing with
+# the SDA pin
 # Two-fold dilution series with text marker and tap water
 # Twenty values recorded for each sample
 # Each tube has 50ul

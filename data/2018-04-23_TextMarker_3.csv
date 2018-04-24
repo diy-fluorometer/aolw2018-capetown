@@ -1,0 +1,84 @@
+# 23.04.2018
+# Two-fold dilution series with text marker and tap water
+# Twenty values recorded for each sample
+# Each tube has 50ul
+# Modified the sample holder by painting it all black inside using an Edding
+# Code change that seems kinda important
+#
+# S1 100ul US
+# S2 50ul water + 50ul S1
+# S3 50ul water + 50ul S2
+# S4 50ul water + 50ul S3
+# S5 50ul water + 50ul S4
+# S6 50ul water + 50ul S5
+# S7 50ul water + 50ul S6
+# S8
+# S9
+# S10
+# S11
+# S12
+# S13
+# S14
+# S14
+# S16
+emptybox,1,21140
+emptybox,2,21200
+emptybox,3,21222
+emptybox,4,21239
+emptybox,5,21253
+emptybox,6,21262
+emptybox,7,21271
+emptybox,8,21277
+emptybox,9,21288
+emptybox,10,21291
+emptybox,11,21298
+emptybox,12,21305
+emptybox,13,21306
+emptybox,14,21321
+emptybox,15,21321
+emptybox,16,21324
+emptybox,17,21323
+emptybox,18,21319
+emptybox,19,21331
+emptybox,20,21334
+mptytube,1,479343
+emptytube,2,480378
+emptytube,3,480930
+emptytube,4,481298
+emptytube,5,481413
+emptytube,6,481804
+emptytube,7,481942
+emptytube,8,481942
+emptytube,9,482333
+emptytube,10,482402
+emptytube,11,482494
+emptytube,12,482448
+emptytube,13,482724
+emptytube,14,482816
+emptytube,15,482862
+emptytube,16,482931
+emptytube,17,483023
+emptytube,18,483115
+emptytube,19,483161
+emptytube,20,483253
+water50ul,1,255392
+water50ul,2,255852
+water50ul,3,256220
+water50ul,4,256427
+water50ul,5,256450
+water50ul,6,256680
+water50ul,7,256772
+water50ul,8,256772
+water50ul,9,256933
+water50ul,10,256979
+water50ul,11,257071
+water50ul,12,257002
+water50ul,13,257140
+water50ul,14,257209
+water50ul,15,257117
+water50ul,16,257209
+water50ul,17,257255
+water50ul,18,257324
+water50ul,19,257301
+water50ul,20,257347
+

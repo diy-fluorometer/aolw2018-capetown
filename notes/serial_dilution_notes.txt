@@ -1,0 +1,43 @@
+Materials
+
+12 PCR tubes
+DNA ladder - 50bp
+DNA dye - GelGreen 10000X in water
+dark box
+
+Prepare the serial dilution:
+
+1. Tubes labelling
+Label 8 PCR tubes:
+TU1 160
+TU2  80
+TU3  40
+TU4  20
+TU5  10
+TU6   5
+TU7   2.5
+TU8   1.25
+Control1: 50ul water
+Control2: 40ul water + 10ul DS
+Control3: Empty tube
+Control4: Empty box
+Label 1 tube for the dye stock: dye 1:99 water
+
+2. Prepare the dye stock
+Pipette in a tube 1ul dye and 99ul water
+
+3. Proceed with the serial dilution
+- pipette 40ul of water in 7 tubes (not in the 160ug/ul)
+- pipette 80ul of DNA in he 160ug/ul tube
+- transfer 40ul from the 160ug/ul to the 80ug/ul and mix by pipetting.
+- Repeat this process for each dilution step, until the lowest concentration is reached
+- dispose of 40 ul from the last tube.
+
+4.
+Add 10ul of dye stock to each tube
+
+16:20: dye+dna -> 16:50
+
+take 20 readings each
+start at 17:50
+
