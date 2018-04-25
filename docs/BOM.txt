@@ -1,0 +1,28 @@
+Fluorometer - Bill of Materials for the AOLW Capetown April 16 - April 27
+
+3mm MDF
+Adafruit TSL2591 Lux sensor, https://www.adafruit.com/product/1980
+NodeMCU Amica V2, https://www.az-delivery.de/products/nodemcu
+Blue LEDs 470-513nm, https://shop.strato.de/epages/15485180.sf/de_DE/?ViewObjectPath=%2FShops%2F15485180%2FProducts%2F%22B-470-513%2FC%22
+56 Ohm resistor
+Jumper cables
+
+510nm Acrylic Long-pass filter, https://www.knightoptical.com/stock/optical-components/uvvisnir-optics/filters/long-pass-filters/acrylic-longpass-filters/colour-filter-acrylic-type-50x50mm-510nm-long-pass/
+490nm Dichroic Glass filter, https://www.knightoptical.com/stock/optical-components/uvvisnir-optics/filters/dichroic-filters/dichroic-shortpass-filters/dichroic-filter-shortpass-490nm--50x50mm-square/
+515nm Glass Long-pass filter, https://www.knightoptical.com/stock/optical-components/uvvisnir-optics/filters/long-pass-filters/colour-glass-longpass-filters/colour-glass-filter-50x50mm515nm-long-pass/
+Washers U2,7K
+Screws M2,5x 8K
+Nuts M2,5
+PCR tubes, standard 0.2ml
+Eppendorf Micropipette 0.5-10ul
+Eppendorf Micropipette 10-100ul
+SafeSeal Tips(R) professional, 10ul, Biozym, http://www.biozym.com/DesktopModules/Webshop/shopdisplayproducts.aspx?tabID=0&productid=16207&id=7&Lang=en-US
+Sterile aerosol pipet tips 100ul, Biozym, N/A
+MicroUSB to USB-A cable
+DNA ladder 50bp plus, BIORON
+DNA ladder 1kb, BIORON
+DNA ladder 100bp plus, BIORON
+GelGreen 10,000X in water, Biotium, https://biotium.com/product/gelgreen-nucleic-acid-gel-stain/
+dsGreen 10,000X, Lumiprobe, https://de.lumiprobe.com/p/sybrgreen-i-gel-stain
+Pico488 200X in DMSO, https://de.lumiprobe.com/p/pico488-picogreen-quantification
+QuickExtract DNA extraction solution, Biozym, http://www.biozym.com/DesktopModules/Webshop/shopdisplayproducts.aspx?productid=8556&id=5482

@@ -1,7 +1,21 @@
-# Integration time: 400ms
+name,seqid,value,gain
+#Integration time: 400ms
 # Taking 20 measurements each
 # Captured with the code version:
-# https://github.com/diy-fluorometer/aolw2018-capetown/tree/master/code/gainTest, commit 1150cda 
+# https://github.com/diy-fluorometer/aolw2018-capetown/tree/master/code/gainTest, commit 1150cda
+# All samples had a volume of 50ul. All samples had 10ul of dye stock,
+# prepared by mixing 1ul of GelGreen 10000X and 99ul of water.
+# DNA used was BIORON 50bp DNA ladder (free of loading dye)
+# Samples were diluted with bottled water.
+# DNA concentrations:
+# TU1: 160    ug/ml
+# TU2:  80    ug/ml
+# TU3:  40    ug/ml
+# TU4:  20    ug/ml
+# TU5:  10    ug/ml
+# TU6:   5    ug/ml
+# TU7:   2.5  ug/ml
+# TU8:   1.25 ug/ml
 emptybox,1,14563,MAX
 emptybox,1,631,HIGH
 emptybox,1,37,MED
