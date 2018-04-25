@@ -1,0 +1,5 @@
+Inkscape puts the line to cut a the border of the line.
+Thus, to lasercut precuisely, you need to have lines of width 0.
+
+The setup:
+View -> display mode -> outline

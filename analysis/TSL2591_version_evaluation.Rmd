@@ -1,0 +1,214 @@
+---
+title: "Fluorometer v3 at AOLW2018, April 16 - April 27, Capetown, South Africa"
+author: "Lisa Thalheim"
+date: "April 25, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+
+## Fluorometer v3 analysis
+
+Our main goal for the workshop was to develop the third iteration of an open DIY fluoromter. The first iteration was built at the Science Hack Day 2017 TODO link. The second iteration I built at home to further develop the proof of concept from the Science Hack Day. It used small homemade cuvettes cut from 8mm/3mm clear acrylic and glued together at the base.
+We envisioned two main changes for the third iteration: Use 0.2ml PCR tubes to hold the samples, and move from an Arduino to a NodeMCU platform.
+This document describes the measurement series we did with the third iteration.
+
+### Text marker dye
+
+TODO
+
+### GelGreen + DNA ladder
+
+We used the 50bp plus DNA ladder by BIORON as a DNA sample with known concentration. The concentration of this ladder was 0.2mg/ml of DNA in a storage buffer of 10mM Tris-HCl, pH 7.5, 1 mM EDTA, 10mM NaCl, according to the manufacturer datasheet.
+
+We decided to create a two-fold serial dilution of the DNA ladder and mix that with a constant volume of GelGreen dye.
+
+The following is the protocol we used.
+
+***
+
+#### Material
+
+12 standard 0.2ml PCR tubes
+DNA ladder - 50bp plus by BIORON
+DNA dye - GelGreen 10,000X in water
+Water, bottled
+Dark box made from cardbox to hold the samples between measurements, to prevent unnecessary exposure of the samples to light
+
+#### Step 1: Preparation of dye stock
+
+In a 0.2ml PCR tube labeled "DS", add 1ul of GelGreen 10,000X to 99ul of water. Mix by pipetting. Store tube in dark box when not used.
+
+#### Step 2: Label the PCR tubes
+
+Label 11 0.2ml PCR tubes to later hold the following samples:
+
+Label      Sample
+--------   --------------
+TU1        160 ug/ml            
+TU2         80 ug/ml          
+TU3         40 ug/ml
+TU4         20 ug/ml
+TU5         10 ug/ml
+TU6          5 ug/ml
+TU7          2.5 ug/ml
+TU8          1.25 ug/ml
+Ctrl1      50ul water
+Ctrl2      40ul water plus 10ul DS
+Ctrl3      Empty tube
+---------  --------------
+
+#### Step 3: Make the two-fold dilution series
+
+1. Add 40ul of water to the tubes TU2 through TU8 and Ctrl2
+2. Add 80ul of DNA ladder to TU1
+3. Transfer 40ul of liquid from TU1 to TU2. Mix by pipetting.
+4. Transfer 40ul of liquid from TU2 to TU3. Mix by pipetting.
+5. Transfer 40ul of liquid from TU3 to TU4. Mix by pipetting.
+6. Transfer 40ul of liquid from TU4 to TU5. Mix by pipetting.
+7. Transfer 40ul of liquid from TU5 to TU6. Mix by pipetting.
+8. Transfer 40ul of liquid from TU6 to TU7. Mix by pipetting.
+9. Transfer 40ul of liquid from TU7 to TU8. Mix by pipetting.
+10. Discard 40ul of liquid from TU8.
+
+#### Step 4: Add the dye stock
+
+Add 10ul of the 1:99 dye stock to the tubes TU1 through TU8 and Ctrl2.
+
+Place all tubes in the dark box after adding the dye to prevent unnecessary exposure to light and possible photobleaching.
+
+#### Step 5: Prepare the water control
+
+Add 50ul of water to the tube Ctrl1.
+
+***
+
+We measured each of the samples in turn, along with one measurement of just the empty box. 20 readings were taken for each sample, using the code in https://github.com/diy-fluorometer/aolw2018-capetown/tree/master/code/gainTest, commit 1150cda.
+
+The resulting output from the device was read from the serial port and placed in the file `../data/2018-04-24_GelGreen_50bpladder_1.csv`.
+
+```{r read-data-gg}
+file <- "../data/2018-04-24_GelGreen_50bpladder_1.csv"
+dataset <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+```
+
+Let's check what the highest gain level is for which we have measurements for all samples. MAX first:
+
+```{r}
+# Check whether each measurement has a MAX reading. This is the case if we have the following number of MAX entries:
+# number of samples * 20 -> |emptybox, emptytube, ctrl1, ctrl2, TU1, ..., TU8| * 20 -> 12 * 20 = 240
+dataset %>% filter(gain == "MAX") %>% summarise(n = n())
+```
+
+No luck here, most measurements do not have a valid value at gain level MAX. Let's check HIGH next: 
+
+```{r}
+# Check whether each measurement has a HIGH reading. This is the case if we have the following number of HIGH entries:
+# number of samples * 20 -> |emptybox, emptytube, ctrl1, ctrl2, TU1, ..., TU8| * 20 -> 12 * 20 = 240
+dataset %>% filter(gain == "HIGH") %>% summarise(n = n())
+```
+
+Ok good, so we can just work with the measurements at gain level high.
+
+```{r}
+ds_high <- dataset %>% filter(gain == "HIGH")
+```
+
+Let's have a first look at the values:
+
+```{r boxplot_gg_high}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("emptybox", "emptytube", "water", "ctrl_dye_water", "TU1", "TU2", "TU3", "TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Empty box", "Empty tube", "Water", "Dye+Water", "160 ug/ml", "80 ug/ml", "40 ug/ml", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The sensor readings for the higher concentrations are quite high when compared to the lower concentrations, so let's zoom in on the 20 ug/ml to 1.25 ug/ml range:
+
+```{r boxplot_gg_high_TU4__TU8}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH", (name == "ctrl_dye_water" | name == "TU4" | name == "TU5" | name == "TU6" | name == "TU7" | name == "TU8")) %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("ctrl_dye_water","TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Dye+Water", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+***
+
+While our samples are not to be considered reliable anymore after sitting around for a day, we decided to make two more sets of measurements, close together: Re-measure all of yesterday's samples, and then remove the resistor (which turned out to be added by mistake - the NodeMCU only outputs 3.3V instead of the Arduino's 5V...) and measure again.
+This should at least maybe get us a little more use out of the samples.
+
+
+```{r read-data-gg-2}
+file <- "../data/2018-04-25_GelGreen_50bpladder_replica2.csv"
+dataset <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+```
+
+Let's check what the highest gain level is for which we have measurements for all samples. MAX first:
+
+```{r}
+# Check whether each measurement has a MAX reading. This is the case if we have the following number of MAX entries:
+# number of samples * 20 -> |emptybox, emptytube, ctrl1, ctrl2, TU1, ..., TU8| * 20 -> 12 * 20 = 240
+dataset %>% filter(gain == "MAX") %>% summarise(n = n())
+```
+
+No luck here, most measurements do not have a valid value at gain level MAX. Let's check HIGH next: 
+
+```{r}
+# Check whether each measurement has a HIGH reading. This is the case if we have the following number of HIGH entries:
+# number of samples * 20 -> |emptybox, emptytube, ctrl1, ctrl2, TU1, ..., TU8| * 20 -> 12 * 20 = 240
+dataset %>% filter(gain == "HIGH") %>% summarise(n = n())
+```
+
+Ok good, so we can just work with the measurements at gain level high.
+
+```{r}
+ds_high <- dataset %>% filter(gain == "HIGH")
+```
+
+Let's have a first look at the values:
+
+```{r boxplot_gg_high-2}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("emptybox", "emptytube", "water", "ctrl_dye_water", "TU1", "TU2", "TU3", "TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Empty box", "Empty tube", "Water", "Dye+Water", "160 ug/ml", "80 ug/ml", "40 ug/ml", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The sensor readings for the higher concentrations are quite high when compared to the lower concentrations, so let's zoom in on the 20 ug/ml to 1.25 ug/ml range:
+
+```{r boxplot_gg_high_TU4__TU8-2}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH", (name == "ctrl_dye_water" | name == "TU4" | name == "TU5" | name == "TU6" | name == "TU7" | name == "TU8")) %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("ctrl_dye_water","TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Dye+Water", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```

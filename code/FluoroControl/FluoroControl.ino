@@ -21,7 +21,7 @@
 
 // When using NodeMCU Amica V2 board:
 // connect SCL to D1
-// connect SCL to D2
+// connect SDA to D2
 // Vin to 3.3-5V
 // GND to GND
 
