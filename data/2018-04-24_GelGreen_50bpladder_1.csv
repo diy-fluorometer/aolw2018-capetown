@@ -1,5 +1,5 @@
 name,seqid,value,gain
-#Integration time: 400ms
+# Integration time: 400ms
 # Taking 20 measurements each
 # Captured with the code version:
 # https://github.com/diy-fluorometer/aolw2018-capetown/tree/master/code/gainTest, commit 1150cda
