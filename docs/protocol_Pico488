@@ -1,0 +1,25 @@
+from https://de.lumiprobe.com/protocols/DNA-quantification-with-Pico488
+
+# DNA quantification with Pico488
+
+Pico488 DNA quantification solution is a practical tool for measuring double-stranded DNA concentration if that cannot be measured at 260 nm in a cuvette. Pico488 selectively binds to double-stranded DNA so nucleotides, single-stranded DNA, RNA, proteins and other impurities do not impede the measurements. The structure of the dye is identical to that of PicoGreen® dye.
+
+The range of linearity for DNA concentration measurements is 1 pg/μL – 5 ng/μL. The dye solution amount is suitable for 200 measurements. For precise reproducible fluorescence measurements, we recommend to use only buffered solutions for mixing the dye with DNA. To calculate DNA concentration we recommend first to perform a series of standard DNA solution measurements for calibration. Both buffer and standard DNA stock solution are available with our Pico488 DNA quantification kit.
+Protocol
+1. Pico488 aqueous solution preparation.
+
+Thaw the content of Pico488 dye vial and dilute a needed amount of the Pico488 dye solution 200-fold with a buffer (10 mM Тris HCl, 1 mM EDTA, pH 7,5 recommended). Mix and use in the course of 3 hours max.
+2. Sample solution preparation.
+
+Dissolve your DNA sample in the buffer to get 1 mL of the solution (you may take any DNA amount you want). Add 1 mL of Pico488 aqueous solution. Mix and incubate for 5 min. Likewise, prepare your standard DNA solutions.
+3. Fluorescence measurements.
+
+Measure fluorescence from standard and sample DNA solutions in a fluorimeter. Absorption wavelength is 503 nm, emission wavelength is 525 nm.
+4. Calculation of concentration.
+Plot fluorescence vs concentration using any software. Obtain linear equation of fluorescence (FL) vs concentration (C) dependence:
+FL= A × C + B.
+
+To calculate DNA concentration in the sample solution:
+Csample = (FLsample – B)/A, where FLsample is sample solution fluorescence.
+To calculate sample DNA concentration:
+Сinit = 2000 × Csample/V, where V is the volume of your initial DNA sample, µL. 
