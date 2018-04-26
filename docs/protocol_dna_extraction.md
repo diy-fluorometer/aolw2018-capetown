@@ -2,12 +2,12 @@
 
 ## Materials
 
-2 Thermos containers
-QuickExtract
-2.0ml reaction tube
-Q-tips
-Dye stock 1:99 GelGreen 10,000X
-0.2ml PCR tube
+* 2 Thermos containers
+* QuickExtract
+* 2.0ml reaction tube
+* Q-tip
+* Dye stock 1:99 GelGreen 10,000X
+* 0.2ml PCR tube
 
 ## Instructions
 
