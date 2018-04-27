@@ -212,3 +212,135 @@ ds_high %>% filter(gain == "HIGH", (name == "ctrl_dye_water" | name == "TU4" | n
   scale_x_discrete(limits = c("ctrl_dye_water","TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Dye+Water", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+Comparing measurements taken 24 hours apart:
+
+```{r read-data-gg-3}
+file <- "../data/2018-04-25_GelGreen_50bpladder_replica1.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-24_GelGreen_50bpladder_1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("+24h")  # The data in ds2 were recorded 24 hours after the ones in ds1
+ds2$experiment <- c("+0h")   #
+ds <- rbind(ds1, ds2)
+```
+
+```{r}
+#ggplot() +
+#  geom_line(mapping = aes(x = seq(1,20), y = value), data = ds, color = "red") +
+#  geom_line(mapping = aes(x = seq(1,20), y = value), data = ds, color = "blue") +
+#  scale_colour_manual("", 
+#                      breaks = c("+24h", "0h"),
+#                      values = c("red", "blue"))
+```
+
+```{r read-data-gg-4}
+file <- "../data/2018-04-26_GelGreen_QE_replica1.csv"
+dataset <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+```
+
+```{r}
+ds_high <- dataset %>% filter(gain == "HIGH")
+```
+
+```{r boxplot_gg_high-3, echo=FALSE}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_water","ctrl_dye_qe", "TU1", "TU3", "TU4", "MS"), labels = c("Empty box", "Dye+Water", "Dye+QE", "160 ug/ml", "40 ug/ml", "20 ug/ml", "MS")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r, echo=FALSE}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH", name != "TU1") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_water","ctrl_dye_qe", "TU3", "TU4", "MS"), labels = c("Empty box", "Dye+Water", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+file <- "../data/2018-04-26_GelGreen_QE_replica1.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_replica1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("QE-1")  # QE-1: First DNA extraction w/ 500ul of QE and 1 swab
+ds2$experiment <- c("QE-2")  # QE-2: Second DNA extraction w/ 300ul of QE and 4 swabs
+ds <- rbind(ds1, ds2)
+ds_high <- ds %>% filter(gain == "HIGH")
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_qe") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "black", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+QE", vjust = 1.5, hjust = -7.5), data = cutoff) +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS", "MS2")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+file <- "../data/2018-04-26_GelGreen_QE_2_filters.csv"
+ds <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds_high <- ds %>% filter(gain == "HIGH")
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "black", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+Water", vjust = 1.5, hjust = -7), data = cutoff) +
+#  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS", "MS2")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+
+ds_max <- ds %>% filter(gain == "MAX")
+unique(ds_max$name)
+```
+
+```{r}
+ds_max <- ds %>% filter(gain == "MAX")
+ctrl_wd_median <- ds_max %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_max %>% filter(name != "TU1", name != "TU2", name != "TU3") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "black", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+Water", vjust = 1.5, hjust = -7), data = cutoff) +
+#  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS", "MS2")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```

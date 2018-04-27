@@ -241,6 +241,8 @@ void loop(void)
 //    Serial.println("no command received");
   }
 
+
+int foo[2] = {1,2};
   if (numRep <= repCount) { // we're done
     stopMeasurement();
   }
