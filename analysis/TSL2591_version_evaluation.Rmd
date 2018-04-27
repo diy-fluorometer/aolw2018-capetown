@@ -344,3 +344,31 @@ ds_max %>% filter(name != "TU1", name != "TU2", name != "TU3") %>%
   labs(y = "Sensor readings", x = "Samples") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+```{r}
+file <- "../data/2018-04-26_GelGreen_QE_2_filters.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-27_GelGreen_QE_2_filters_plus24h.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("QE+0")  # QE+0: 2nd DNA extraction w/ 300ul of QE and 4 swabs, dichroic+glass filters
+ds2$experiment <- c("QE+24")  # QE+24: Same as QE-1, but measured again 24 hours later
+ds <- rbind(ds1, ds2)
+ds_high <- ds %>% filter(gain == "HIGH")
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_qe") %>% summarise(m = median(value))
+ctrl_wd_median$m
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "black", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+QE", vjust = 1.5, hjust = -7.5), data = cutoff) +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS", "MS2")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```

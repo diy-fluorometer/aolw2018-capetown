@@ -1,0 +1,26 @@
+---
+title: "AOLW2018, 16.04.2018 - 27.04.2018, Capetown, South Africa - Final report"
+author: "Lisa Thalheim"
+date: "April 27, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+
+## Abstract
+
+## Introduction
+
+## Previous work
+
+## Objectives for the Advanced Open Labware Workshop
+
+## Work done at the Advanced Open Labware Workshop
+
+## Results and lessons learned
+
+## Future work
