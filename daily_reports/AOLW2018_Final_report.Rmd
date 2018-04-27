@@ -1,6 +1,6 @@
 ---
 title: "AOLW2018, 16.04.2018 - 27.04.2018, Capetown, South Africa - Final report"
-author: "Lisa Thalheim"
+author: "Lisa Thalheim, Robert Richter, Alessandro Volpato"
 date: "April 27, 2018"
 output: html_document
 ---
@@ -15,12 +15,63 @@ library(ggplot2)
 
 ## Introduction
 
+Fluorometric quantification of DNA is an established method of quality control when working with DNA samples, particularly for downstream work such as PCR and DNA sequencing. Quality control of DNA samples serves several purposes for these methods: 1) to establish a baseline for reproducibility, 2) to troubleshoot experiments, and 3) to catch poor starting conditions early, before wasting costly reagents and consumables. This quality control of DNA samples usually consists of two complementary steps: 1) Estimation of the purity of the sample, which is done using UV spectrophotometry, and 2) DNA quantification using fluorescent dyes. This work focuses on the latter.
+
+Fluorometers are commercially available for around $4000 when bought new. This is a substantial amount of money for labs with limited funds, such as labs in Low and Middle Income Countries (LMIC) as well as citizen science labs. Since the working principle of fluorometers is relatively simple, we set out to build a DIY version and evaluate its performance in relation to a) commercial systems and b) lab procedures that were of particular importance to us (namely DNA sequencing with an Oxford Nanopore MinION). Our main motivating question was: Can we build a fluorometer from relatively cheap parts that performs well enough for our purposes?
+
 ## Previous work
 
+A first proof-of-principle fluorometer was built at the Science Hack Day Berlin in November 2017. It did not yet produce results that would be useful for quality control of DNA samples, but we did manage to get measurements that allowed us to distinguish between different dilutions of a DNA ladder with a starting concentration of 200ug/ml. This first prototype used an Adafruit TSL2591 light sensor, a blue LED, a 510nm long-pass acrylic filter, an Arduino and a 10ul pipette tip as a sample vessel.
+
+A second prototype was built in December 2017 which aimed to improve on the proof-of-principle device. It used a hand-made "cuvette" that consisted of two pieces cut from 3mm and 8mm clear acrylic that were then glued together. The volume of this cuvette was 45ul. The same sensor, microcontroller platform and LED were used, but a plastic lens with a diameter of 10mm and an FL of 10.3mm was added to focus the fluorescent light on the sensor. The results were a lot more encouraging for this version. The linear range of the system was not well established, but the lower detection limit was determined to be around 10ug/ml.
+
+Some problems and open questions remained with this second prototype. We were not convinced that the hand-made cuvette was a good approach - the laser melted the acrylic in non-reproducible ways that left clearly visible streaks and distortions on the surface of the material. The process of glueing the two parts together was also tedious and imprecise and not conducive to reproducibility.
+The 510nm long-pass filter was also chosen for easy availability rather than suitability, so we wanted to try some more deliberately selected filters to see whether this would yield improvements. The fluorescent dye used in all experiments so far was GelGreen, which is not as well established as other dyes such as SYBR Green I and PicoGreen. Again, this dye was chosen because it was easily available to us, not because it was known to be a good dye to use. On the contrary: There are protocols and publications on DNA quantification with SYBR Green I and PicoGreen, but none that use GelGreen.
+Another open question was how the device would behave when measuring a sample from an actual DNA extraction; so far, only DNA ladders without loading dye were used as samples. It is possible that samples from DNA extraction behave quite different than DNA ladders, which are presumably fairly pure.
+
 ## Objectives for the Advanced Open Labware Workshop
+
+The main objective for the workshop was to try some of the ideas for improvements that came out of the previous designs. We also wanted to move from the Arduino platform to a NodeMCU platform, which is cheaper and also includes WiFi. This would enable us to build a device that can be controlled from a tablet, mobile phone or a computer that is placed out of the way, instead of always having to connect the fluorometer to a computer, which can be impractical in an actual wetlab setting. To take advantage of this change, we planned on modifying the user interface of the device.
+
+Additionally, one of the team members wanted to try a wholly different approach that would dispense with the need for a dedicated microprocessor platform altogether and work only from a smartphone, using a photoresistor, a filter and a blue LED.
+
+The following was our task list at the start of the workshop:
+
+1. Create a modified design of the device for use with standard 0.2ml PCR tubes instead of the hand-made cuvettes, and then produce a device according to this design.
+2. Move the existing control code to the NodeMCU platform.
+3. Change the user interface of the device, from text commands on the serial port to a browser-based interface.
+4. Evaluate different optical filters, lenses, and fluorescent dyes.
+5. Assemble a proof-of-principle for the smartphone-only approach and evaluate it.
+6. Do an actual DNA extraction and take measurement from this sample; previously, only DNA ladders were used as samples, which may behave very differently than samples from DNA extractions.
+
+We wanted to answer the following questions:
+
+1. Is the performance of our design centered around 0.2ml PCR tubes as good as or better than the one centered around the hand-made cuvettes?
+2. Is the NodeMCU controller capable of handling both measurements and a WiFi-based user interface side-by-side without too much interference between them?
+3. Does the performance of the device improve significantly when using other, more delibaretly selected (and more expensive) filters? Or is the previously used cheap acrylic filter good enough?
+4. Among the dyes that we have available, is there one that performs particularly well in our device? Is there one that performs particularly poorly? How big are the differences? Are they big enough to justify using a more expensive dye?
+5. Does the smartphone-based idea work at all? Is it sensitive enough to quantitatively distinguish between different DNA concentrations? How does its performance compare to the MCU-based version?
 
 ## Work done at the Advanced Open Labware Workshop
 
 ## Results and lessons learned
 
+* Buffer
+* Bug in Arduino code
+* Smartphone-only version is awesome
+* Expensive filters do not seem to improve the performance?
+* Also seems to work with extracted DNA
+* Lens may or may not be necessary
+* Detection limit was a little higher than the hand-made cuvette version, meaning that we lost a bit of sensitivity when moving to the new design.
+
+## Discussion
+
 ## Future work
+
+* Text marker dye?
+* Buffer
+
+## References
+
+that one paper about distilled water versus buffer
+that one paper about DNA quantification with spectroscopy and fluorometry
