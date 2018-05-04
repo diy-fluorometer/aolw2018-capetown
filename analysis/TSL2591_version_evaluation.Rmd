@@ -372,3 +372,65 @@ ds_high %>% filter(gain == "HIGH") %>%
   labs(y = "Sensor readings", x = "Samples") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+```{r}
+file <- "../data/2018-04-25_GelGreen_50bpladder_replica2.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_replica1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_filters.csv"
+ds3 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("510nm acrylic")  # ladder only, filter: 510nm acrylic
+ds2$experiment <- c("QE, 510a")  # DNA extraction, filter: 510nm acrylic
+ds3$experiment <- c("495nm dichroic+515nm glass")  # DNA extraction, filters: dichroic + glass long-pass
+#ds <- rbind(ds1, ds2, ds3)
+ds <- rbind(ds1, ds3)
+
+ds_high <- ds %>% filter(gain == "HIGH", name != "ctrl_dye_qe", name != "MS", name != "MS2", name != "water", name != "emptybox", name != "emptytube")
+ds1_ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water", experiment == "510nm acrylic") %>% summarise(m = median(value))
+ds2_ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water", experiment == "495nm dichroic+515nm glass") %>% summarise(m = median(value))
+cutoff1 <- data.frame(yintercept=ds1_ctrl_wd_median$m, cutoff=factor(ds1_ctrl_wd_median$m))
+cutoff2 <- data.frame(yintercept=ds2_ctrl_wd_median$m, cutoff=factor(ds2_ctrl_wd_median$m))
+ds_high %>% 
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff1, colour = "black", size = 0.2) +
+#  geom_text(aes(0, yintercept, label = "Dye+Water 510nm", vjust = 1.5, hjust = -2), data = cutoff1) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff2, colour = "black", size = 0.2) +
+#  geom_text(aes(0, yintercept, label = "Dye+Water Dichroic+glass", vjust = 1.5, hjust = -2), data = cutoff2) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+I'm looking at the difference between the filter sets again: 510nm acrylic long-pass versus a combination of short-pass dichroic 495nm and long-pass glass 515nm. Generally speaking, the dichroic/glass combination results in much less light reaching the sensor (which is to be expected). However, this difference in light levels is not constant; there appears to be some correlation to the DNA concentration. The following is a graph of the differences between corresponding measurements for each set of filters:
+
+```{r}
+ds <- read.csv("/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/data/2018-04-28_510nm_dichroicglass_diff.csv", header = TRUE, sep = ",", comment.char = "#")
+ds %>% filter(gain == "HIGH") %>% ggplot() + geom_boxplot(mapping = aes(x = name, y = value))
+```
+
+Looking at this picture, it appears that the 510nm acrylic long-pass filter lets through a lot more of the emission light, whereas the dichroic/glass combination filters out a lot of that emissions light? Because if the dichroic/glass combination only (or mostly) filtered out the excitation light as desired, the difference between the two samples would be more or less constant.
+I think it's interesting here to look at ctrl_dye_water, emptybox and emptytube. The difference for emptybox is insubstantial. The difference for emptytube, however, is not. It's actually quite big. Since in this sample, all light reaching the sensor must be excitation light, we can conclude that the dichroic/glass combination succeeds at filtering out quite a bit of the excitation light.
+There are two possibilities here: 1) The dichroic filter takes away too much light that would otherwise lead to increased excitement of the fluorescent dye and thus more fluorescence. 2) The 515nm long-pass filter takes away too much of the fluorescent light.
+To resolve this, I should take measurements with more combinations of filters: 515nm glass only, and 510nm acrylic plus dichroic.
+
+The following at least generates a data frame with the median for all values of a measurement series and gain
+
+```{r}
+ds1 %>% group_by(name, gain) %>% summarize(n = n(), med = median(value))
+```
+
+```{r}
+diffCorresponding <- function(df) {
+  for (ex in unique(df$experiment)
+}
+```

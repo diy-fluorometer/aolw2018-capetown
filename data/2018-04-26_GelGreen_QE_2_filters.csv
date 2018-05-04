@@ -6,7 +6,7 @@ name,seqid,value,gain
 # All samples had a volume of 50ul. All samples had 10ul of dye stock,
 # prepared by mixing 1ul of GelGreen 10000X and 99ul of water.
 # DNA used in the MS sample was extracted from Robert's mouth swab with QuickExtract
-# 300ul of QE + four mouth swabs
+# MS2: 300ul of QE + four mouth swabs
 # TU1, TU3, TU4 and ctrl_dye_water were from previous experiment
 # emptybox, ctrl_dye_water, ctrl_dye_qe, TU1, TU3, TU4, MS2
 # started at 17:19pm

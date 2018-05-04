@@ -1,5 +1,5 @@
 ---
-title: "AOLW2018, 16.04.2018 - 27.04.2018, Capetown, South Africa - Final report"
+title: "AOLW2018, 16.04.2018 - 28.04.2018, Capetown, South Africa - Final report"
 author: "Lisa Thalheim, Robert Richter, Alessandro Volpato"
 date: "April 27, 2018"
 output: html_document
@@ -54,24 +54,339 @@ We wanted to answer the following questions:
 
 ## Work done at the Advanced Open Labware Workshop
 
+### Device v3 to accomodate standard 0.2ml PCR tubes
+
+We designed and built another version of the device. On the outside, it looks identical to the previous v2. Both designs consist of an outer box to block out ambient light and an inner sampling assembly. On the inside, we made some changes:
+
+* The sample will be contained in a 0.2ml PCR tube with a target sample volume of 50ul. The sensor, filter and LED were aligned to be on the same plane as the mid-point of those 50ul.
+* In v2, the sample was illuminated from below. Since the PCR tubes have a conical shape (as opposed to the flat base of the cuvette used in v2), we thought it better to illuminate the sample from the side and place the sensor at a 90 degree angle to the LED. The LED does not protrude into measuring chamber so that it does not shine directly on the sensor. Instead, it is very nearly flush with the material.
+* We did not use a lens in the v3 design. Instead, we moved the sensor as close as possible to where the PCR tube sits. Our reasoning was that the lens was necessary in the v2 design since the sensor was approximately 5cm away from the sample, but it might not be necessary when placing the sensor very close to the sample (~5mm).
+
+We used the same filter as in the v2 design (510nm acrylic long-pass).
+
+### Dilution series with text marker dye
+
+We made a two-fold dilution series using yellow text marker dye. This is a cheap first test to check a new setup, since yellow text marker dye has similar excitation/emission wavelengths to the green fluorescent DNA dyes (GelGreen, SYBR Green I, PicoGreen). It also permits evaluating the linearity of the measurement setup without the additional complexity that stems from the interaction dynamics between dye and DNA. 
+The protocol we used is given in Appendix B.
+
+### Dilution series with GelGreen and DNA ladder
+
+We made a two-fold dilution series of DNA ladder (50 bp plus DNA Ladder with no loading dye, BIORON) and ended up with 8 samples with concentrations ranging from 160ug/ml to 1.25ug/ml. We decided to set up the dilution series so that the total amount of dye would be the same in all samples. We briefly discussed setting up a mixture of DNA and dye first and then making a serial dilution from this mixture, but decided against it. This approach would have meant varying both the DNA concentration and the dye concentration in each sample, which would have made the measurements more difficult to interpret. Besides, adding a constant amount of dye more closely mirrors the procedure of actual fluorometric quantification, where the same amount of dye is added to every sample to be measured, and where the calibration using DNA standards of known concentrations is done with reference to a certain fixed amount of dye added.
+So we set up the dilution series first to a volume of 40ul and then added 10ul of the same diluted dye stock to all samples. We only tested with one dye concentration so far, a 1:99 dilution of GelGreen 10,000X. Since there are no protocols available for performing DNA quantifications with GelGreen, we estimated the concentration based on the manufacturer's protocol for post-staining gels.
+The protocol we used to set up the serial dilution is given in Appendix C.
+
+### Measurements with GelGreen and extracted DNA 
+
+TODO
+
+### Measurements with different filters
+
+TODO
+
 ## Results and lessons learned
 
-* Buffer
-* Bug in Arduino code
-* Smartphone-only version is awesome
-* Expensive filters do not seem to improve the performance?
-* Also seems to work with extracted DNA
-* Lens may or may not be necessary
-* Detection limit was a little higher than the hand-made cuvette version, meaning that we lost a bit of sensitivity when moving to the new design.
+### Buffer
 
-## Discussion
+TODO theoretical only at this point
+
+### Bug in Arduino code
+
+I discovered a bug in my Arduino code, specifically in how I handled the different gain levels. My approach to translating all levels to a single scale was plain wrong. This means that data from the previous version is not directly comparable to the data from the workshop version, except for the readings at very low light levels (where the values come from sensor readings at gain level MAX). So we need to proceed with caution when comparing the two systems, or just generate new data altogether.
+
+To work around this bug until I can implement and test a better solution, I recorded the sensor readings at all gain levels for each sample. So a measurement right now consists of four tuples (gainlevel,value).
+
+### Smartphone-only version is awesome
+
+TODO Robert should write something about this.
+
+### More expensive filters do not lead to an obvious improvement
+
+We had different filters to test with: a cheap acrylic 510nm long-pass filter, and more expensive glass filters (515nm coloured glass long-pass, 495nm dichroic short-pass). In addition to the cost, the glass filters are also much harder to cut into smaller pieces for someone with little experience in glass cutting. It is possible to custom-order smaller pieces, but this comes at an (unknown) extra cost. The acrylic filter, on the other hand, can easily be cut into smaller pieces even by someone who is relatively inexperienced.
+Generally speaking, the dichroic/glass combination results in much less light reaching the sensor (which is to be expected):
+
+```{r echo=FALSE}
+file <- "../data/2018-04-25_GelGreen_50bpladder_replica2.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_replica1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_filters.csv"
+ds3 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("510nm acrylic")  # ladder only, filter: 510nm acrylic
+ds2$experiment <- c("QE, 510a")  # DNA extraction, filter: 510nm acrylic
+ds3$experiment <- c("495nm dichroic+515nm glass")  # DNA extraction, filters: dichroic + glass long-pass
+#ds <- rbind(ds1, ds2, ds3)
+ds <- rbind(ds1, ds3)
+ds_high <- ds %>% filter(gain == "HIGH", name != "ctrl_dye_qe", name != "MS", name != "MS2")
+ds1_ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water", experiment == "510nm acrylic") %>% summarise(m = median(value))
+ds2_ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water", experiment == "495nm dichroic+515nm glass") %>% summarise(m = median(value))
+cutoff1 <- data.frame(yintercept=ds1_ctrl_wd_median$m, cutoff=factor(ds1_ctrl_wd_median$m))
+cutoff2 <- data.frame(yintercept=ds2_ctrl_wd_median$m, cutoff=factor(ds2_ctrl_wd_median$m))
+ds_high %>% 
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff1, colour = "black", size = 0.2) +
+#  geom_text(aes(0, yintercept, label = "Dye+Water 510nm", vjust = 1.5, hjust = -2), data = cutoff1) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff2, colour = "black", size = 0.2) +
+#  geom_text(aes(0, yintercept, label = "Dye+Water Dichroic+glass", vjust = 1.5, hjust = -2), data = cutoff2) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+However, this difference in light levels is not constant; there appears to be some correlation to the DNA concentration. The following is a graph of the differences between corresponding measurements for the two filter setups (510nm acrylic long-pass vs 495nm dichroic short-pass plus 515nm glass long-pass):
+
+```{r echo=FALSE}
+ds <- read.csv("/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/data/2018-04-28_510nm_dichroicglass_diff.csv", header = TRUE, sep = ",", comment.char = "#")
+ds %>%
+  filter(gain == "HIGH") %>%
+  ggplot() +
+    geom_boxplot(mapping = aes(x = name, y = value)) +
+    labs(y = "Delta", x = "Samples") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+There are two possibilities here: 1) The dichroic filter takes away too much light that would otherwise lead to increased excitement of the fluorescent dye and thus more fluorescence. 2) The 515nm long-pass filter takes away too much of the fluorescent light. The reason for both may be either that the filters we have are not ideally matched to GelGreen, or that this is a more fundamental problem when working with dyes where the excitation and the emission wavelengths are very close together.
+To resolve this, we should take measurements with more combinations of filters: 515nm glass only, and 510nm acrylic plus dichroic.
+
+It is noteworthy that the lower detection limit did not improve with the more expensive glass filters.
+
+### Testing with extracted DNA
+
+We learned that our system detects something, although we obviously have no way of confidently stating that the DNA concentration we estimated from our data for these samples was in any way accurate. Nevertheless, there were two valuable results from this experiment:
+
+1. The system does detect DNA in something other than a pure DNA sample, which the DNA ladder should be assumed to be. Before the workshop, the fluorometer had only been tested using DNA ladder, and it was entirely possible that a real-world extracted DNA sample would give no results at all, or totally nonsensical results.
+2. We did see an increase in fluorescence when we adapted our DNA extraction protocol in a way that was designed to yield more DNA.
+
+### Lens does not appear to be necessary
+
+Since the measurements for the previous version v2 that did include a lens were taken using incorrect code, the measurements from the two versions are not directly comparable, so we cannot quantify the impact of our design change between v2 and v3. However, a good amount of light reached the sensor in our v3 design that did not include a lens. Only the concentrations of 20ug/ml and below even returned valid values for the maximum gain setting. This indicates that a lens is not necessary, as long as the sensor is placed very close to the sample.
+
+### The v2 version using a hand-made cuvette could detect sligthly lower concentrations than the v3 version 
+
+This has to be taken with a grain of salt since the sensor code of v2 returned invalid values for any gain setting other than MAX. However, for lower concentrations of DNA, the v2 code likely recorded the MAX gain setting, which are returned unaltered, so there is a good chance that we can compare the values from v2 and v3 at lower DNA concentrations.
+It looks like the lower detection limit for the v2 version was around 10ug/ml, while that for v3 was 20ug/ml. By lower detection limit, we mean the highest concentration at which the sensor readings are very similar to the Dye+Water control, which means that we would be unable to distinguish this concentration of DNA from a water sample.
+This merits further investigation: It is possible that this is a fluke in the data, or it is possible that our sensor/LED setup in v3 led to a real change, or it is possible that the shape and optical properties of the PCR tubes vs. the cuvette lead to this change.
 
 ## Future work
 
-* Text marker dye?
-* Buffer
+### Text marker dye as a cheap standard
+
+We considered investigating text marker dye as a cheap standard. This was an idea that Ben Pfaffenhausen proposed. I'm not convinced this will actually give good enough results since there are several variations in the system (preparation of dye stock and preparation of buffer for example) that you would not be able to capture with the text marker dye, but I like the idea and would like to see whether you could get some benefit out of it.
+
+### Re-do the experiments we did at the workshop with proper buffer, and continue with that as well
+
+We will make TE buffer and run through the same experiments again using that. This is necessary since all protocols we've found for SYBR Green I and PicoGreen use buffers, and also the paper by Nakayama et al showed somewhat convincingly that diluting with distilled water can lead to an underestimation of the DNA concentration in some types of samples. So at least we would need a good argument to keep using distilled water.
+
+### Re-do the experiments with the two other dyes (Pico488 ~ PicoGreen and dsGreen ~ SYBR Green I)
+
+### Re-do the experiments with other filter combinations
+
+### Re-do the experiments with different dye concentrations
+
+So far, we only tested with a single dye concentration. There are no protocols for performing fluorometric DNA quantification with GelGreen, and so it is entirely unclear whether the concentration we chose is optimal. It is also unclear whether the dynamic range of GelGreen is sufficient to capture a broad range of DNA concentrations, or whether GelGreen has properties similar to that of Hoechst dye 33285, which is known to have a limited dynamic range so that it is standard practice to take two fluorometric measurements, each one using a different concentration of this dye.
+
+### Characterize the different combinations of dyes and filters and sample vessels better
+
+TODO linear ranges, upper and lower detection limits
+
+### Migrate to the NodeMCU
+
+TODO This already falls in the realm of product development.
+
+### Get some solid data on the sample vessel question
+
+TODO PCR tube or fabbed cuvette? Characterize both.
+
+### Comparison with a commercially available fluorometry system (e.g. Qubit)
+
+This will mainly serve to better understand the performance and limitations of our system, and to enable us as well as users to decide whether the DIY fluorometer could be sufficient for their particular application.
+
+### Make a version of the fluorometer from transparent acrylic for education purposes
+
+Since it is such a simple measurement principle and such a simple device, it could be interesting to have a see-through version for education purposes and to illustrate how the device works.
+
+### Idea to evaluate: Measuring absorbance
+
+The question here is whether we would gain anything by adding measurement of absorbance. This could be done by shining light that does not excite the dye (e.g. red light) through the sample and measuring the amount of light that arrives at the sensor, then performing the same measurement with an empty chamber and an empty tube and comparing the three values. The motivation for this is that samples with a very high DNA and/or dye concentration will be more opaque than samples with a lower DNA concentration.
+We arrived at this question mostly from experiments with text marker dye, where the effect is very pronounced. It is entirely unclear how much this affects measurements with DNA, though.
+
+## What work would we want to add before considering publishing this in a journal?
+
+Things I would like to see in such a paper:
+
+* Is it feasible to use PCR tubes, or fabbed microliter cuvettes? What are the performance parameters of such a system (linear range? upper and lower detection limits?) This would be interesting because proper microliter cuvettes are expensive and not trivial to source.
+* What is the performance of the different dyes with our system? One interesting aspect of this might be that one of the dyes we used (GelGreen) has, as far as I know, not yet shown up in a publication for the application of DNA quantification. What is the relationship between dye cost and performance? Also, the dsGreen dye we have is meant for gel staining. The qPCR version is much more expensive, but I think that using the cheaper gel staining version is probably not a problem when following the standard method of fluorescence quantification, which always includes measuring reference standards along with your actual sample.
+* Comparison with a Qubit system
+* Comparison of different filters, again with an eye towards cost/performance tradeoffs
+* Maybe get a bigger sample of lambda DNA or something - I'm starting to run low on my DNA ladders, and we're starting to mix and match different ones, which is methodically not a super-clean thing to do...
+
+## Conclusion
+
+TODO
 
 ## References
 
+TODO
+
 that one paper about distilled water versus buffer
 that one paper about DNA quantification with spectroscopy and fluorometry
+that paper with fluorescence detection using a modified flatbed scanner
+
+## Appendix A - Protocol: DNA extraction and measurement using Epicentre QuickExtract DNA extraction solution
+
+This protocol was adapted from the manufacturer's protocol (http://www.epibio.com/docs/default-source/protocols/buccalamp-dna-extraction-kit-quickextract-dna-extraction-solution-1-0-catch-all-sample-collection-swabs.pdf?sfvrsn=6).
+We adapted it slightly to compensate for the unavailability of a vortexer: Instead of vortexing, we vigorously agitated the sample by hand. We also used regular Q-tips instead of specialized buccal swabs. This might have affected the yield, and certainly led to contamination with DNA from other sources. However, the latter was not a concern for our purposes.
+
+### Materials
+
+* 2 Thermos containers
+* QuickExtract
+* 2.0ml reaction tube
+* Q-tips
+* Dye stock 1:99 GelGreen 10,000X
+* 0.2ml PCR tube
+* Micropipette 10-100ul
+* Micropipette, 0.5-10ul
+* Pipette tips, 10ul
+* Pipette tips, 100ul
+
+### Instructions
+
+#### Step 1 - Prepare the water baths
+
+1. Label the thermos containers, 65C and 98C
+2. Heat water and adjust to 65C and 98C using a thermometer. Close the containers.
+
+#### Step 2 - Label the reaction tubes
+
+1. Label the 2.0ml reaction tube "QE" for QuickExtract
+2. Label the 0.2ml PCR tube "MS" for measurement sample
+
+#### Step 2 - Prepare the reaction tubes
+
+1. Transfer 0.5ml of QuickExtract into the tube labeled "QE"
+
+#### Step 3 - Take the sample
+
+1. Thoroughly rinse out the subject’s mouth twice with water. We recommend that
+subjects abstain from drinking coffee before tissue collection. Alternatively, instruct
+subjects to gently brush the inside surface of both cheeks with a toothbrush
+(without toothpaste) followed by a thorough rinsing of the mouth with water.
+2. Collect tissue by rolling the Q-Tip firmly on the inside of
+the cheek, approximately 20 times on each side, making certain to move the brush
+over the entire cheek.
+3. Place the swab end of the Q-tip into the tube labeled "QE" and rotate the brush a minimum of five times.
+Press the brush against the side of the tube and rotate the brush while removing it
+from the tube to ensure most of the liquid remains in the tube.
+3.1 (optional, to improve yield) Repeat with three more Q-tips.
+4. Screw the cap on the tube tightly and shake thoroughly for 10 seconds. Incubate the tube at 65°C for 1 minute.
+5. Shake thoroughly for 15 seconds.
+6. Transfer the tube to 98°C and incubate for 2 minutes.
+8. Shake thoroughly for 15 seconds.
+
+#### Step 4 - Prepare the sample for measurement
+
+1. Transfer 40ul of liquid from the tube labeled "QE" to the tube labeled "MS"
+2. Transfer 10ul of dye stock 1:99 to the tube labeled "MS"
+3. Incubate the tube "MS" for 30 minutes at room temperature
+
+#### Step 5 - Take the measurement
+
+1. Measure Dye+Water control, Dye+QE control, TU1, TU3, TU4, MS and record the measurements
+
+## Appendix B - Protocol: Preparing a serial dilution of text marker dye
+
+### Materials
+
+* 16 0.2ml PCR tubes
+* Stabilo Boss text marker, yellow
+* Micropipette 10-100ul
+* Pipette tips, 100ul
+* Bottled water
+
+### Instructions
+
+#### Step 1 - Labeling the tubes
+
+Label 16 PCR tubes "S1" through "S16".
+
+#### Step 2 - Preparing the text marker dye stock
+
+1. Using the 10-100ul micropipette at 100ul, draw up text marker dye by sticking the pipette tip into the text marker tip. Draw up slowly.
+2. Transfer the text marker dye into the tube labelled S1.
+You may need to repeat this once or twice to get a total volume of 100ul of dye.
+
+#### Step 3 - Preparing a two-fold serial dilution
+
+1. Add 50ul of water to tubes S2 through S16.
+2. Transfer 50ul of liquid from tube S1 to tube S2. Mix by pipetting.
+3. Transfer 50ul of liquid from tube S2 to tube S3. Mix by pipetting.
+4.-16. Repeat until you transfer into S16.
+17. Remove 50ul of liquid from S16 and discard it.
+
+## Appendix C - Protocol: Preparing a serial dilution of DNA ladder and GelGreen 
+
+### Materials
+
+* 12 0.2ml PCR tubes
+* 100ul DNA ladder, starting concentration 200ug/ml
+* DNA dye - GelGreen 10,000X in water
+* Dark box (Can just be a cardboard box)
+* Bottled water
+
+### Instructions
+
+#### Step 1 - Preparation of dye stock
+
+Transfer 99ul of water into the tube labeled DS. Add 1ul of GelGreen 10,000X and mix by pipetting. Store tube in dark box when not used.
+
+#### Step 2 - Labeling the tubes
+
+Label 12 PCR tubes as follows:
+
+| Label | Comment    |
+| ----- | ---------- |
+| TU1   | 160 ug/ml  |
+| TU2   | 80 ug/ml   |
+| TU3   | 40 ug/ml   |
+| TU4   | 20 ug/ml   |
+| TU5   | 10 ug/ml   |
+| TU6   | 5 ug/ml    |
+| TU7   | 2.5 ug/ml  |
+| TU8   | 1.25 ug/ml |
+| H20   | Control 1, water |
+| Dye+H2O| Control 2, water + dye stock |
+| Empty | Control 3, Empty tube |
+| DS    | Dye stock |
+
+#### Step 3 - Making the two-fold dilution series
+
+1. Add 40ul of water to the tubes TU2 through TU8 and Dye+H2O
+2. Add 80ul of DNA ladder to TU1
+3. Transfer 40ul of liquid from TU1 to TU2. Mix by pipetting.
+4. Transfer 40ul of liquid from TU2 to TU3. Mix by pipetting.
+5. Transfer 40ul of liquid from TU3 to TU4. Mix by pipetting.
+6. Transfer 40ul of liquid from TU4 to TU5. Mix by pipetting.
+7. Transfer 40ul of liquid from TU5 to TU6. Mix by pipetting.
+8. Transfer 40ul of liquid from TU6 to TU7. Mix by pipetting.
+9. Transfer 40ul of liquid from TU7 to TU8. Mix by pipetting.
+10. Discard 40ul of liquid from TU8.
+
+#### Step 4: Adding the dye stock
+
+Add 10ul of the 1:99 dye stock to the tubes TU1 through TU8 and Dye+H2O.
+
+Place all tubes in the dark box after adding the dye to prevent unnecessary exposure to light and possible photobleaching.
+
+#### Step 5: Preparing the water control
+
+Add 50ul of water to the tube H2O.
