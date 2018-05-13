@@ -37,11 +37,11 @@ Another open question was how the device would behave when measuring a sample fr
 The main objective for the workshop was to try some of the ideas for improvements that came out of the previous designs. The main one was to use standard 0.2ml PCR tubes instead of fabbed cuvettes, since they are widely available and thus do not require a manufacturing step.
 We also wanted to move from the Arduino platform to a NodeMCU platform, which is cheaper and also includes WiFi. This would enable us to build a device that can be controlled from a tablet, mobile phone or a computer that is placed out of the way, instead of always having to connect the fluorometer to a computer, which can be impractical in an actual wetlab setting. To take advantage of this change, we planned on modifying the user interface of the device.
 
-Additionally, one of the team members wanted to try a wholly different approach that would dispense with the need for a dedicated microprocessor platform altogether and work only from a smartphone, using a photoresistor, a filter and a blue LED.
+Additionally, one of the team members wanted to try a different approach that would dispense with the need for a dedicated microprocessor platform altogether and work only from a smartphone, using a photoresistor, a filter and a blue LED.
 
 The following was our task list at the start of the workshop:
 
-1. Create a modified design of the device for use with standard 0.2ml PCR tubes instead of the hand-made cuvettes, and then produce a device according to this design.
+1. Create a modified design of the device for use with standard 0.2ml PCR tubes instead of the hand-made cuvettes, and then produce a device according to this design. The LED, light sensor (TSL2591) and filter (510nm long-pass acrylic) would be the same as in the previous versions.
 2. Move the existing control code to the NodeMCU platform.
 3. Change the user interface of the device, from text commands on the serial port to a browser-based interface.
 4. Evaluate different optical filters, lenses, and fluorescent dyes.
@@ -93,6 +93,13 @@ The two glass filters (495nm dichroic short-pass and 515nm colour glass long-pas
 ### Measurements with different filters
 
 All initial measurements were done with the 510nm acrylic long-pass filter placed between the sample and the sensor. We then changed the setup and used the 515nm colour glass long-pass filter placed between the sample and the sensor, and the 495nm dichroic glass short-pass filter placed between the LED and the sample. We then measured the serial dilution of DNA ladder plus GelGreen with these filters in place. We also measured the two DNA extraction samples with this new filter setup.
+
+### Assembly and testing of smartphone-only version
+
+Robert proposed building another version that would be centered around an OTG-capable smartphone and a photoresistor.
+His basic idea was to supply baseline power of 3V to an LED from the smartphone and modify a pair of headphones with built-in microphone. One of the two audio output wires would be connected to the LED so that any sound played from the smartphone would become an additional voltage input for the LED. The LED thus gets an input voltage between 2.5V and 3.5V depending on the audio signal played from the smartphone. The photoresistor would be connected to the microphone wire; any changes in light would thus become an "audio" input signal to the smartphone. Due to the strongly nonlinear behaviour of the LED the light is very well modulated and can be measured with the photoresistor soldered to the microphone.
+
+We used the same case for this smartphone-version except that the sensor mount was modified to accomodate a photoresistor rather than the TSL2591 lux sensor.
 
 ## Results and lessons learned
 
@@ -182,9 +189,9 @@ ds_high %>% filter(gain == "HIGH") %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-### Smartphone-only version is awesome
+### The smartphone-only version works and gives relative readings comparable to the TSL2591-centered version.
 
-TODO Robert could write something about this.
+TODO
 
 ### More expensive filters do not lead to an obvious improvement
 
