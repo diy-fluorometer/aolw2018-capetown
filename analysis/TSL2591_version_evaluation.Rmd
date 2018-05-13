@@ -428,9 +428,3 @@ The following at least generates a data frame with the median for all values of 
 ```{r}
 ds1 %>% group_by(name, gain) %>% summarize(n = n(), med = median(value))
 ```
-
-```{r}
-diffCorresponding <- function(df) {
-  for (ex in unique(df$experiment)
-}
-```

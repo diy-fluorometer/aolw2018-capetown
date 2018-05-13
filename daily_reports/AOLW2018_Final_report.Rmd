@@ -13,6 +13,9 @@ library(ggplot2)
 
 ## Abstract
 
+Fluorometric DNA quantification is an established laboratory procedure for which commercial products are available. The simplicity of the method lends itself well to an Open Hardware and DIY approach, which permits practitioners to build a simple low-cost device that gives sufficiently accurate measurements for at least some applications.
+During the Advanced Open Labware Workshop in Capetown, South Africa, we worked on building and characterizing such a device. All work at the workshop was done with the goal of eventually being able to release a bundle of CAD files, code, assembly instructions, and documentation for this OpenFluorometer.
+
 ## Introduction
 
 Fluorometric quantification of DNA is an established method of quality control when working with DNA samples, particularly for downstream work such as PCR and DNA sequencing. Quality control of DNA samples serves several purposes for these methods: 1) to establish a baseline for reproducibility, 2) to troubleshoot experiments, and 3) to catch poor starting conditions early, before wasting costly reagents and consumables. This quality control of DNA samples usually consists of two complementary steps: 1) Estimation of the purity of the sample, which is done using UV spectrophotometry, and 2) DNA quantification using fluorescent dyes. This work focuses on the latter.
@@ -31,7 +34,8 @@ Another open question was how the device would behave when measuring a sample fr
 
 ## Objectives for the Advanced Open Labware Workshop
 
-The main objective for the workshop was to try some of the ideas for improvements that came out of the previous designs. We also wanted to move from the Arduino platform to a NodeMCU platform, which is cheaper and also includes WiFi. This would enable us to build a device that can be controlled from a tablet, mobile phone or a computer that is placed out of the way, instead of always having to connect the fluorometer to a computer, which can be impractical in an actual wetlab setting. To take advantage of this change, we planned on modifying the user interface of the device.
+The main objective for the workshop was to try some of the ideas for improvements that came out of the previous designs. The main one was to use standard 0.2ml PCR tubes instead of fabbed cuvettes, since they are widely available and thus do not require a manufacturing step.
+We also wanted to move from the Arduino platform to a NodeMCU platform, which is cheaper and also includes WiFi. This would enable us to build a device that can be controlled from a tablet, mobile phone or a computer that is placed out of the way, instead of always having to connect the fluorometer to a computer, which can be impractical in an actual wetlab setting. To take advantage of this change, we planned on modifying the user interface of the device.
 
 Additionally, one of the team members wanted to try a wholly different approach that would dispense with the need for a dedicated microprocessor platform altogether and work only from a smartphone, using a photoresistor, a filter and a blue LED.
 
@@ -77,17 +81,26 @@ The protocol we used to set up the serial dilution is given in Appendix C.
 
 ### Measurements with GelGreen and extracted DNA 
 
-TODO
+We collected material using cheek swabs from Robert and extracted DNA from this material using QuickExtract DNA extraction solution. We chose this route because the extraction protocol is very simple, fast and convenient and does not require any lab equipment beyond two hot water baths at 65C and 98C. The protocol we followed is given in Appendix A.
+We then mixed 40ul of the DNA sample with 10ul of our GelGreen dye stock (1ul GelGreen 10,000X in 99ul of bottled water) and took readings in our fluorometer.
+We did a second DNA extraction using QuickExtract where we aimed to increase DNA yield, following the manufacturer's
+recommendations to use four swabs instead of one. Again, we mixed 40ul of sample from this second extraction with 10ul of our GelGreen dye stock.
+
+### Cutting glass filters
+
+The two glass filters (495nm dichroic short-pass and 515nm colour glass long-pass) were delivered to us as squares of 5cm by 5cm. Since these dimensions were too large for our device, and also because we were hoping to get several useable filters out of these squares, we had brought along a glass cutter and a small mount made of plastic to keep the filters in place while cutting them. We cut the filters into smaller pieces that would fit into our device. We did get some useable pieces out of this and still have parts of the filters left, but the results were not good. The glass splintered in unintended ways and gave us irregularly shaped As it turns out, cutting small pieces of glass into even smaller pieces takes more practice than we had.
 
 ### Measurements with different filters
 
-TODO
+All initial measurements were done with the 510nm acrylic long-pass filter placed between the sample and the sensor. We then changed the setup and used the 515nm colour glass long-pass filter placed between the sample and the sensor, and the 495nm dichroic glass short-pass filter placed between the LED and the sample. We then measured the serial dilution of DNA ladder plus GelGreen with these filters in place. We also measured the two DNA extraction samples with this new filter setup.
 
 ## Results and lessons learned
 
 ### Buffer
 
-TODO theoretical only at this point
+All protocols that we found for DNA quantification using the fluorescent dyes PicoGreen and SYBR Green I use TE buffer to dissolve DNA and/or to dilute the dye. Alessandro also found a paper quantifying the reason for using buffer instead of distilled water [Nakayama et al 2016]. Briefly, for some types of DNA samples, diluting with distilled water will lead to underestimation of the DNA concentration. The authors speculate that this may be due to conformational changes in the DNA caused by low-salt conditions that reduce affinity for the fluorescent dye.
+Before this background, we would need a good reason and a good argument to keep using distilled water, and generally to diverge from established and widely-used protocols, which we don't have, so we resolved to hold off on most of the measurements until we are back in Berlin and get ahold of some TE buffer.
+It would be interesting to do measurements with distilled water and added NaCl instead of TE, since the former is probably easier to come by in a remote setting or a setting with limited resources.
 
 ### Bug in Arduino code
 
@@ -95,9 +108,83 @@ I discovered a bug in my Arduino code, specifically in how I handled the differe
 
 To work around this bug until I can implement and test a better solution, I recorded the sensor readings at all gain levels for each sample. So a measurement right now consists of four tuples (gainlevel,value).
 
+### The lower detection limit of the v3 prototype was around 20ug/ml
+
+A more detailed view of the data we recorded during the workshop can be found in the separate document `analysis/TSL2591_version_evaluation.Rmd` in our GitHub repository (https://github.com/diy-fluorometer/aolw2018-capetown/blob/master/analysis/TSL2591_version_evaluation.Rmd).
+The following is an excerpt that shows the results from the serial dilution of DNA ladder with GelGreen.
+
+```{r echo=FALSE}
+file <- "../data/2018-04-25_GelGreen_50bpladder_replica2.csv"
+dataset <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+
+ds_high <- dataset %>% filter(gain == "HIGH")
+
+rects <- data.frame(start=4.5, end=8.5, group=seq_along(start))
+
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("emptybox", "emptytube", "water", "ctrl_dye_water", "TU1", "TU2", "TU3", "TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Empty box", "Empty tube", "Water", "Dye+Water", "160 ug/ml", "80 ug/ml", "40 ug/ml", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_rect(data=rects, inherit.aes=FALSE, aes(xmin=start, xmax=end, ymin=0,
+                ymax=max(ds_high$value) + 3000, group=group), color="transparent", fill="orange", alpha=0.3)
+```
+
+The sensor readings for the higher concentrations are quite high when compared to the lower concentrations, so let's zoom in on the 20 ug/ml to 1.25 ug/ml range:
+
+```{r echo=FALSE}
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_water") %>% summarise(m = median(value))
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH", (name == "ctrl_dye_water" | name == "TU4" | name == "TU5" | name == "TU6" | name == "TU7" | name == "TU8")) %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value)) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red") +
+  scale_x_discrete(limits = c("ctrl_dye_water","TU4", "TU5", "TU6", "TU7", "TU8"), labels = c("Dye+Water", "20 ug/ml", "10 ug/ml", "5 ug/ml", "2.5 ug/ml", "1.25 ug/ml")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(y = "Sensor readings", x = "Samples")
+```
+
+The horizontal line shows the sensor readings for our water+dye control, which contains no DNA. As can be seen in the plot, we can somewhat distinguish the 20ug/ml sample from the water+dye control, but the 10ug/ml is so close to the water+dye control that we cannot really distinguish the two. It is interesting to note the behaviour of the fluorometer for the samples of even lower concentration, 5ug/ml and below.
+
+### Our DNA extraction did not yield an awesome amount of DNA
+
+```{r echo=FALSE}
+file <- "../data/2018-04-26_GelGreen_QE_replica1.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_replica1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("Extraction from one swab")  # QE-1: First DNA extraction w/ 500ul of QE and 1 swab
+ds2$experiment <- c("Extraction from four swabs")  # QE-2: Second DNA extraction w/ 300ul of QE and 4 swabs
+ds <- rbind(ds1, ds2)
+ds_high <- ds %>% filter(gain == "HIGH")
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_qe") %>% summarise(m = median(value))
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment), na.rm=TRUE) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+QE", vjust = 1.5, hjust = -7.5), data = cutoff) +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "One swab", "Four swabs")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
 ### Smartphone-only version is awesome
 
-TODO Robert should write something about this.
+TODO Robert could write something about this.
 
 ### More expensive filters do not lead to an obvious improvement
 
@@ -170,7 +257,7 @@ We learned that our system detects something, although we obviously have no way 
 
 Since the measurements for the previous version v2 that did include a lens were taken using incorrect code, the measurements from the two versions are not directly comparable, so we cannot quantify the impact of our design change between v2 and v3. However, a good amount of light reached the sensor in our v3 design that did not include a lens. Only the concentrations of 20ug/ml and below even returned valid values for the maximum gain setting. This indicates that a lens is not necessary, as long as the sensor is placed very close to the sample.
 
-### The v2 version using a hand-made cuvette could detect sligthly lower concentrations than the v3 version 
+### The v2 version using a fabbed cuvette could detect sligthly lower concentrations than the v3 version 
 
 This has to be taken with a grain of salt since the sensor code of v2 returned invalid values for any gain setting other than MAX. However, for lower concentrations of DNA, the v2 code likely recorded the MAX gain setting, which are returned unaltered, so there is a good chance that we can compare the values from v2 and v3 at lower DNA concentrations.
 It looks like the lower detection limit for the v2 version was around 10ug/ml, while that for v3 was 20ug/ml. By lower detection limit, we mean the highest concentration at which the sensor readings are very similar to the Dye+Water control, which means that we would be unable to distinguish this concentration of DNA from a water sample.
@@ -180,31 +267,55 @@ This merits further investigation: It is possible that this is a fluke in the da
 
 ### Text marker dye as a cheap standard
 
-We considered investigating text marker dye as a cheap standard. This was an idea that Ben Pfaffenhausen proposed. I'm not convinced this will actually give good enough results since there are several variations in the system (preparation of dye stock and preparation of buffer for example) that you would not be able to capture with the text marker dye, but I like the idea and would like to see whether you could get some benefit out of it.
+We considered investigating text marker dye as a cheap standard. This was an idea that Ben Pfaffenhausen proposed. I'm not 100% convinced this will actually give good enough results since there are several variations in the system (preparation of dye stock and preparation of buffer for example) that you would not be able to capture with the text marker dye, but I like the idea and would like to see whether you could get some benefit out of it.
 
-### Re-do the experiments we did at the workshop with proper buffer, and continue with that as well
+### Repeat the experiments we did at the workshop with proper buffer, and continue with that as well (with caveats)
 
-We will make TE buffer and run through the same experiments again using that. This is necessary since all protocols we've found for SYBR Green I and PicoGreen use buffers, and also the paper by Nakayama et al showed somewhat convincingly that diluting with distilled water can lead to an underestimation of the DNA concentration in some types of samples. So at least we would need a good argument to keep using distilled water.
+We will make TE buffer and run through the same experiments again using that. This is necessary since all protocols we've found for SYBR Green I and PicoGreen use buffers, and also the paper [Nakayama et al 2016] showed somewhat convincingly that diluting with distilled water can lead to an underestimation of the DNA concentration in some types of samples. So at least we would need a good argument to keep using distilled water.
+I would like to do measurements with distilled water with an appropriate amount of NaCl added, simply because this would be cheaper and easier to source than TE.
 
-### Re-do the experiments with the two other dyes (Pico488 ~ PicoGreen and dsGreen ~ SYBR Green I)
+### Repeat the experiments with the two other dyes (Pico488 ~ PicoGreen and dsGreen ~ SYBR Green I)
 
-### Re-do the experiments with other filter combinations
+Repeat the DNA ladder serial dilution as well as the DNA extraction measurements using Pico488 and dsGreen. There are protocols available for fluorometric DNA quantification with these two dyes, so we are going to follow them.
 
-### Re-do the experiments with different dye concentrations
+### Repeat the experiments with other filter combinations
+
+Since the first experiment with different filter sets left some questions open, we should repeat the DNA ladder serial dilution as well as the DNA quantification measurements using different filter combinations and compare the results:
+
+* 510nm acrylic long-pass plus 495nm dichroic short-pass
+* 515nm colour glass long-pass only
+
+### Repeat the experiments with different dye concentrations
 
 So far, we only tested with a single dye concentration. There are no protocols for performing fluorometric DNA quantification with GelGreen, and so it is entirely unclear whether the concentration we chose is optimal. It is also unclear whether the dynamic range of GelGreen is sufficient to capture a broad range of DNA concentrations, or whether GelGreen has properties similar to that of Hoechst dye 33285, which is known to have a limited dynamic range so that it is standard practice to take two fluorometric measurements, each one using a different concentration of this dye.
 
 ### Characterize the different combinations of dyes and filters and sample vessels better
 
-TODO linear ranges, upper and lower detection limits
+For each of the two sample vessels 0.2ml PCR tube and hand-made cuvette, perform the experiments in the following matrix:
+
+| Dye \\ Filters | 510nm LP only | 515nm LP only | 495nm SP + 510nm LP | 495nm SP + 515nm LP |
+| -------------- | ------------- | ------------- | ------------------- | ------------------- |
+| GelGreen 1:99  |               |               |                     |                     |
+| GelGreen 1:49  |               |               |                     |                     |
+| GelGreen 1:199 |               |               |                     |                     |
+| Pico488 (protocol)  |               |               |                     |                     |
+| dsGreen (protocol)  |               |               |                     |                     |
+
+
+For each of the combinations, determine the linear ranges of DNA concentrations, as well as the upper and lower detection limits.
 
 ### Migrate to the NodeMCU
 
-TODO This already falls in the realm of product development.
+Continue the work on migration to NodeMCU, making full use of the NodeMCU's features. Eventually, we'd like a device that just needs to connected to a power source and can be interacted with wirelessly.
+
+### Single value output
+
+Right now, each measurement records the sensor reading at each of the four gain settings. It would be better to fold this into one value, possibly based on the Lux calculation in Adafruit's TSL2591 library. This is a task for after doing all the experimental measurements outlined above, though.
 
 ### Get some solid data on the sample vessel question
 
-TODO PCR tube or fabbed cuvette? Characterize both.
+Since the data we have suggest that the fabbed cuvette allows for detection of lower DNA concentrations, let's figure out whether this is an actual fact or just a fluke in the data. If the fabbed cuvette turns out to be better, it could be worth trying to improve on it, for example by casting the cuvettes from some kind of resin. The cast would be made in a CNC mill.
+We should probably keep around both options, since using 0.2ml PCR tubes may be preferable to some people, depending on their requirements and resources.
 
 ### Comparison with a commercially available fluorometry system (e.g. Qubit)
 
@@ -227,19 +338,20 @@ Things I would like to see in such a paper:
 * What is the performance of the different dyes with our system? One interesting aspect of this might be that one of the dyes we used (GelGreen) has, as far as I know, not yet shown up in a publication for the application of DNA quantification. What is the relationship between dye cost and performance? Also, the dsGreen dye we have is meant for gel staining. The qPCR version is much more expensive, but I think that using the cheaper gel staining version is probably not a problem when following the standard method of fluorescence quantification, which always includes measuring reference standards along with your actual sample.
 * Comparison with a Qubit system
 * Comparison of different filters, again with an eye towards cost/performance tradeoffs
-* Maybe get a bigger sample of lambda DNA or something - I'm starting to run low on my DNA ladders, and we're starting to mix and match different ones, which is methodically not a super-clean thing to do...
+* Make all measurements from now on with the same DNA standard, rather than mixing and matching different ones just because we still have some left. and we're starting to mix and match different ones, which is methodically not a super-clean thing to do...
 
 ## Conclusion
 
-TODO
+We built a v3 prototype of the OpenFluorometer that uses 0.2ml PCR tubes as sample vessels. The measurement data we obtained during the workshop suggests that these vessels may not be ideal for fluorometric DNA quantification, although they may be sufficient for some applications where low concentrations (below 20ug/ml) are not of interest to the user.
+We tested different filter sets; our data so far suggest that using expensive glass filters may not be necessary and may in fact decrease performance. We also learned that incorporating a lens in the optical setup of our fluorometer may not be necessary as long as the sensor is placed as close as possible to the sample. We learned that using distilled water to dilute samples and dye may lead to underestimation of the DNA concentration in a sample, and thus TE or at least distilled water with added NaCl should be used instead.
+
+We tested a different approach that uses only a smartphone, an LED and a photoresistor and found that it gave good results, comparable to that of our other version using a more expensive light sensor.
+We defined a set of experiments that we want to perform going forward in an effort to develop the OpenFluorometer to a point where it can be used in real applications.
 
 ## References
 
-TODO
-
-that one paper about distilled water versus buffer
-that one paper about DNA quantification with spectroscopy and fluorometry
-that paper with fluorescence detection using a modified flatbed scanner
+[Nakayama et al 2016] Nakayama, Y., Yamaguchi, H., Einaga, N., & Esumi, M. (2016). Pitfalls of DNA Quantification Using DNA-Binding Fluorescent Dyes and Suggested Solutions. PLoS ONE, 11(3), e0150528. http://doi.org/10.1371/journal.pone.0150528
+[Gallagher and Desjardins 2008] Gallagher, S. R. and Desjardins, P. R. (2008), Quantitation of DNA and RNA with Absorption and Fluorescence Spectroscopy. Current Protocols in Protein Science, 52: A.4K.1-A.4K.21. doi:10.1002/0471140864.psa04ks52
 
 ## Appendix A - Protocol: DNA extraction and measurement using Epicentre QuickExtract DNA extraction solution
 
