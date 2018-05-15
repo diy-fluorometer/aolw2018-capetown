@@ -2,7 +2,7 @@
 title: "AOLW2018, 16.04.2018 - 28.04.2018, Capetown, South Africa - Final report"
 author: "Lisa Thalheim, Robert Richter, Alessandro Volpato"
 date: "April 27, 2018"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -66,7 +66,9 @@ We designed and built another version of the device. On the outside, it looks id
 * In v2, the sample was illuminated from below. Since the PCR tubes have a conical shape (as opposed to the flat base of the cuvette used in v2), we thought it better to illuminate the sample from the side and place the sensor at a 90 degree angle to the LED. The LED does not protrude into measuring chamber so that it does not shine directly on the sensor. Instead, it is very nearly flush with the material.
 * We did not use a lens in the v3 design. Instead, we moved the sensor as close as possible to where the PCR tube sits. Our reasoning was that the lens was necessary in the v2 design since the sensor was approximately 5cm away from the sample, but it might not be necessary when placing the sensor very close to the sample (~5mm).
 
-We used the same filter as in the v2 design (510nm acrylic long-pass).
+We used the same filter as in the v2 design (510nm acrylic long-pass). The circuit we used was the same as in the v2 design, with a NodeMCU switched out for the Arduino:
+
+![Schematic for the TSL2591 version v3](/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/docs/TSL2591_NodeMCU_schem.png)
 
 ### Dilution series with text marker dye
 
@@ -97,7 +99,9 @@ All initial measurements were done with the 510nm acrylic long-pass filter place
 ### Assembly and testing of smartphone-only version
 
 Robert proposed building another version that would be centered around an OTG-capable smartphone and a photoresistor.
-His basic idea was to supply baseline power of 3V to an LED from the smartphone and modify a pair of headphones with built-in microphone. One of the two audio output wires would be connected to the LED so that any sound played from the smartphone would become an additional voltage input for the LED. The LED thus gets an input voltage between 2.5V and 3.5V depending on the audio signal played from the smartphone. The photoresistor would be connected to the microphone wire; any changes in light would thus become an "audio" input signal to the smartphone. Due to the strongly nonlinear behaviour of the LED the light is very well modulated and can be measured with the photoresistor soldered to the microphone.
+His basic idea was to supply baseline power of 3V to an LED from the smartphone and modify a pair of headphones with built-in microphone. One of the two audio output wires would be connected to the LED so that any sound played from the smartphone would become an additional voltage input for the LED. The LED thus gets an input voltage between 2.5V and 3.5V depending on the audio signal played from the smartphone. The photoresistor would be connected to the microphone wire; any changes in light would thus become an "audio" input signal to the smartphone. Due to the strongly nonlinear behaviour of the LED the light is very well modulated and can be measured with the photoresistor soldered to the microphone. See schematic below.
+
+![Schematic for the smartphone/photoresistor version](/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/sketches/IMG-20180513-WA0001.jpg)
 
 We used the same case for this smartphone-version except that the sensor mount was modified to accomodate a photoresistor rather than the TSL2591 lux sensor.
 
@@ -189,9 +193,44 @@ ds_high %>% filter(gain == "HIGH") %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-### The smartphone-only version works and gives relative readings comparable to the TSL2591-centered version.
+### The smartphone-only version works and gives relative readings somewhat comparable, but not entirely congruent with the TSL2591-centered version.
 
-TODO
+Generally speaking, the smartphone-only version could in principle distinguish between different concentrations of DNA in the experiments with DNA marker, as apparent from the graph below:
+
+![Measurements with two-fold serial dilution of DNA marker with the smartphone-version](/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/sketches/chart_dna_cell.png)
+
+The measurements from the two versions were not 100% consistent, though. For example, they contradict each other on the DNA extraction samples. While the TSL2591-version predicts a higher DNA concentration for the MS2 extraction (four swabs) over the MS extraction (one swab), the smartphone-version predicts just the opposite.
+
+![Measurements of extracted DNA with the smartphone-version](/home/lisa/projects/biolab/hardware/fluorometer/aolw2018-capetown/analysis/DNA_cheek_cell__3.png)
+
+```{r echo=FALSE}
+file <- "../data/2018-04-26_GelGreen_QE_replica1.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+file <- "../data/2018-04-26_GelGreen_QE_2_replica1.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1$experiment <- c("MS")  # QE-1: First DNA extraction w/ 500ul of QE and 1 swab
+ds2$experiment <- c("MS2")  # QE-2: Second DNA extraction w/ 300ul of QE and 4 swabs
+ds <- rbind(ds1, ds2)
+ds_high <- ds %>% filter(gain == "HIGH")
+ctrl_wd_median <- ds_high %>% filter(name == "ctrl_dye_qe") %>% summarise(m = median(value))
+cutoff <- data.frame(yintercept=ctrl_wd_median$m, cutoff=factor(ctrl_wd_median$m))
+ds_high %>% filter(gain == "HIGH") %>%
+  ggplot() + 
+  geom_boxplot(mapping = aes(x = name, y = value, colour = experiment), na.rm=TRUE) +
+  geom_hline(aes(yintercept=yintercept), data=cutoff, colour = "red", size = 0.2) +
+  geom_text(aes(0, yintercept, label = "Dye+QE", vjust = 1.5, hjust = -7.5), data = cutoff) +
+  scale_x_discrete(limits = c("emptybox", "ctrl_dye_qe", "TU3", "TU4", "MS", "MS2"), labels = c("Empty box", "Dye+QE", "40 ug/ml", "20 ug/ml", "MS", "MS2")) +
+  labs(y = "Sensor readings", x = "Samples") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+This will need more work to suss out.
 
 ### More expensive filters do not lead to an obvious improvement
 
