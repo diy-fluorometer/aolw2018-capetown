@@ -6,7 +6,7 @@
 // Apparently, dynamic allocation of memory is no bueno in the Arduino world,
 // so let's fix the maximum number of measurements per run.
 
-#define MAX_MEASUREMENTS 100
+#define MAX_MEASUREMENTS 1
 
 class Run {
   
@@ -16,6 +16,17 @@ class Run {
     boolean active = false;
     Measurement m[MAX_MEASUREMENTS];
     uint8_t idx = 0;
+    
+    void reset_measurements() {
+      for (int i = 0; i < MAX_MEASUREMENTS; i++) {
+        m[i].reset();
+      }
+    }
+    
+    void start() {
+      reset_measurements();
+      active = true;
+    }
 };
 
 #endif // __FLUORO_RUN_H__

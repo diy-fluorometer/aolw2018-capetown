@@ -4,7 +4,6 @@
 
 void process_http(WiFiServer *server, Run *current_run) {
 
-  Serial.println("[process_http] enter");
   String request;
   WiFiClient client = server->available();   // Listen for incoming clients
 
@@ -21,10 +20,6 @@ void process_http(WiFiServer *server, Run *current_run) {
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
 
             if (request.indexOf("GET /calibrate/1") >= 0) {
               	// TODO implement
@@ -39,12 +34,21 @@ void process_http(WiFiServer *server, Run *current_run) {
 //              if (result == ERR_NOT_CALIBRATED) {
 //                message = "At least one reference point is not set. Please calibrate the device first.";
 //              }
-            } else if (request.indexOf("GET /run/start/") >= 0) {
-            	message = "Not implemented";
-            } else if (request.indexOf("GET /run/stop/") >= 0) {
+            } else if (request.indexOf("GET /run/start") >= 0) {
+                current_run->start();
+            client.println("HTTP/1.1 302 Found");
+            client.println("Location: /");
+            client.println("Connection: close");
+            client.println();
+            return;
+            } else if (request.indexOf("GET /run/stop") >= 0) {
             	message = "Not implemented";            	
             }
-            
+
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println("Connection: close");
+            client.println();
             Serial.println("[process_http] Returning document to client");
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
@@ -56,27 +60,22 @@ void process_http(WiFiServer *server, Run *current_run) {
             client.println(".button2 {background-color: #77878A;}</style></head>");
             
             // Web Page Heading
-            client.println("<body><h1>Fluorometer</h1>");
+            client.println("<body><h1>OpenFluoro</h1>");
             
             client.println("<p>" + message + "</p>");
             uint8_t i = (current_run->idx == 0) ? 0 : current_run->idx - 1;
-            client.print("<p>Last light intensity value read: ");
+            client.print("<p><h1>");
             if (current_run->m[i].is_valid) {
               client.print(current_run->m[i].value);
             } else {
               client.print("(no valid value)");
             }
-            client.println("</p>");
-            client.println("<form action=\"/\" method=\"get\">");
-            client.println("<p>Run name: <input type=\"text\" name=\"run\"></p>");
-            client.println("<p># of data points: <input type=\"text\" name=\"n\"></p>");
-            client.println("<p><input type=\"submit\" value=\"Set\"");
-            client.println("</form>");
-            client.println("<p><a href=\"/calibrate/1\"><button class=\"button\">Calibrate - Ref1</button></a></p>");
-            client.println("<p><a href=\"/calibrate/2\"><button class=\"button\">Calibrate - Ref2</button></a></p>");
+            client.println("</h1></p>");
+//            client.println("<p><a href=\"/calibrate/1\"><button class=\"button\">Calibrate - Ref1</button></a></p>");
+//            client.println("<p><a href=\"/calibrate/2\"><button class=\"button\">Calibrate - Ref2</button></a></p>");
 //            client.println("<p><a href=\"/measure\"><button class=\"button\">Take measurement</button></a></p>");
-            client.println("<p><a href=\"/test/start\"><button class=\"button\">Start Test</button></a></p>");
-            client.println("<p><a href=\"/test/stop\"><button class=\"button\">Stop Test</button></a></p>");
+            client.println("<p><a href=\"/run/start\"><button class=\"button\">Read sample</button></a></p>");
+//            client.println("<p><a href=\"/test/stop\"><button class=\"button\">Stop Test</button></a></p>");
 
             client.println("</body></html>");
             
@@ -96,5 +95,4 @@ void process_http(WiFiServer *server, Run *current_run) {
     // Close the connection
     client.stop();
   }   
-  Serial.println("[process_http] leave");        
 }

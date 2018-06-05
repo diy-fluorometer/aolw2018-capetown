@@ -39,6 +39,7 @@ int32_t raw_read(uint8_t gain);
 void stop_measurement();
 void process_http();
 void calibrate(uint8_t ref);
+const tsl2591IntegrationTime_t integrationTime = TSL2591_INTEGRATIONTIME_600MS; // longest integration time
 
 const char* ssid     = "Fluoro";
 const char* password = "VerySecure";
@@ -72,9 +73,6 @@ void setup(void)
     
     pinMode(BLUE_LED_PIN, OUTPUT);
     digitalWrite(BLUE_LED_PIN, LOW);
-
-    current_run.idx = 0;
-    current_run.active = true;
   } 
   else {
     Serial.println("No sensor found ... check your wiring?");
@@ -109,9 +107,10 @@ void take_measurement() {
 #if DEBUG
     Serial.println("Done taking measurements");
 #endif
-//    current_run.active = false;
+    current_run.active = false;
     current_run.idx = 0;
-//    return;
+    digitalWrite(BLUE_LED_PIN, LOW);
+    return;
   }
 
 #if DEBUG
@@ -124,7 +123,7 @@ void take_measurement() {
   int32_t v = raw_read(TSL2591_GAIN_MAX);
   timestamp = millis();
   current_run.m[current_run.idx].timestamp = timestamp;
-  current_run.m[current_run.idx].value = v;
+  current_run.m[current_run.idx].value_max = v;
   if (v < 0) {
     if (v == ERR_NO_SENSOR ||
         v == ERR_INVALID_PARAMETER) {
@@ -144,6 +143,7 @@ void take_measurement() {
     Serial.println(v);
 #endif
     current_run.m[current_run.idx].is_valid = true;
+    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_MAX);
     current_run.idx++;
     return;
   }
@@ -171,12 +171,9 @@ void take_measurement() {
 #if DEBUG
     Serial.print("HIGH: "); Serial.print(v); Serial.print(" ");
 #endif
-    v *= (TSL2591_GMAX_FACTOR / TSL2591_GHIGH_FACTOR);
-#if DEBUG
-    Serial.println(v);
-#endif
+
     current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = v;
+    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_HIGH);
     current_run.idx++;
     return;
   }
@@ -203,12 +200,9 @@ void take_measurement() {
 #if DEBUG
     Serial.print("MED: "); Serial.print(v); Serial.println(" ");
 #endif
-    v *= (TSL2591_GHIGH_FACTOR / TSL2591_GMED_FACTOR);
-#if DEBUG
-    Serial.println(v);
-#endif
+
     current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = v;
+    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_MED);
     current_run.idx++;
     return;
   }
@@ -240,12 +234,9 @@ void take_measurement() {
 #if DEBUG
     Serial.print("LOW: "); Serial.print(v); Serial.println(" ");
 #endif
-    v *= (TSL2591_GMED_FACTOR / TSL2591_GLOW_FACTOR);
-#ifdef DEBUG
-    Serial.println(v);
-#endif    
+   
     current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = v;
+    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_LOW);
     current_run.idx++;
     return;
   }  
@@ -308,7 +299,8 @@ void configure_sensor(void)
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
-  tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
+  //tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
+  tsl.setTiming(integrationTime);  // longest integration time (dim light)
 
   /* Display the gain and integration time for reference sake */  
   //Serial.println("------------------------------------");
