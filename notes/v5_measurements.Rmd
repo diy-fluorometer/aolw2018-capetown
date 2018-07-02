@@ -1,0 +1,66 @@
+---
+title: "OpenFluoro v5 Tests"
+author: "Lisa Thalheim"
+date: "July 1, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup: Device version, software version
+
+## Protocol: Pico488
+
+### Step 1: Prepare the Pico488 aqueous solution.
+
+Thaw the content of Pico488 dye vial and dilute a needed amount of the Pico488 dye solution with a buffer (10 mM Тris HCl, 1 mM EDTA, pH 7,5 recommended). Mix and use in the course of 3 hours max.
+
+To make 1 ml of Pico488 aqueous solution:
+
+* 12.5 ul Pico488
+* 987.5 ul TE
+
+Background: The original protocol calls for a 200-fold dilution and then instructs the user to mix 1ml of DNA sample with 1ml of Pico488 aequeous solution. (https://de.lumiprobe.com/protocols/DNA-quantification-with-Pico488), meaning it's a 1:1 mixture. Since I want to stick with the 4:1 scheme from previous measurements - 40ul of DNA sample, 10ul of dye stock - I adjusted the instructions. 200-fold dilution means 5ul of Pico488 added to 995ul of TE. The 1:1 mixture of dye solution plus DNA sample will thus have 5ul of dye in 2ml of sample. So we need to solve for x in the equation
+x / 50ul = 5ul / 2000ul.
+Doing this, we get x = 0.125ul. This is the amount of dye that needs to be in the 10ul dye volume. So if we want to make 1ml of dye solution we need 12.5ul of dye ($10ul * 100 = 1000ul = 1ml$, $0.125ul * 100 = 12.5ul$).
+
+However, 1ml is too much - we only need 100ul, and the aeqeous solution is only good for 3 hours, so let's make less, say, 200ul:
+
+* 2.5 ul Pico488
+* 197.5 ul TE
+
+## Step 2: Prepare the DNA ladder stock
+
+We are working with Lambda Phage DNA, 0.5g/ml. To get values that are comparable to the last measurement series, let's stay with the concentrations as much as possible. The last series started from 160ug/ml. Since the starting concentration of this ladder is higher than the one we used previously, we can add an additional data point at 320 ul.
+
+To get the starting stock for this dilution series, mix
+
+* 64 ul of DNA ladder (500ug/ml)
+* 36 ul TE
+
+Background: Solve for x in the equation 320ug / x = 500ug / 1000ul, gives x = 640ul. We only want to make 100ul rather than 1ml, so we need 640ul / 10 = 64ul of DNA ladder and top it up to 100ul with TE.
+
+### Step 3: Prepare the two-fold serial dilution
+
+Sample name | DNA conc. in ug/ml
+----------- | ----------
+S0          | 320
+S1          | 160
+S2          | 80
+S3          | 40
+S4          | 20
+S5          | 10
+S6          | 5
+S7          | 2.5
+S8          | 1.25
+Ctrl-TE     | 0
+Ctrl-Dye    | 0
+
+Add 40ul of TE to tubes S1 through S8, and Ctrl-Dye.
+Add 50ul of TE to Ctrl-TE.
+Put 80ul of the ladder stock in S0.
+Transfer 40ul from S0 to S1, mix by pipetting, then transfer 40ul from S1 to S2. Repeat until S8.
+Discard 40ul from S8.
+Add 10ul of aqeous dye solution to S0 through S8 and Ctrl-Dye.

@@ -56,9 +56,9 @@ void configureSensor(void)
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS);  // shortest integration time (bright light)
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_200MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
-  tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
+  //tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
-  //tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
 
   /* Display the gain and integration time for reference sake */  
   //Serial.println("------------------------------------");

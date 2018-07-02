@@ -35,18 +35,57 @@ void process_http(WiFiServer *server, Run *current_run) {
 //                message = "At least one reference point is not set. Please calibrate the device first.";
 //              }
             } else if (request.indexOf("GET /run/start") >= 0) {
-                current_run->start();
-            client.println("HTTP/1.1 302 Found");
-            client.println("Location: /");
-            client.println("Connection: close");
-            client.println();
-            return;
+                // Expecting a string of either of two formats:
+                // 1. GET /run/start
+                // 2. GET /run/start?n=%d&name=%s
+                int nIdx = request.indexOf("n=");
+                int ampIdx = request.indexOf("&");
+                int nameIdx = request.indexOf("name=");
+                int spcIdx = request.indexOf(" ", 5); // ugggh hack
+                Serial.println("i'm here");
+                if (nIdx >= 0 &&
+                    ampIdx >= 0 &&
+                    nameIdx >= 0 &&
+                    spcIdx >= 0) {
+                    uint8_t runN = (uint8_t)request.substring(nIdx+2, ampIdx).toInt();
+                    String runName = request.substring(nameIdx+5, spcIdx);
+                    current_run->start(runN, runName);
+                    Serial.println(runN); Serial.println(runName);
+                } else {
+                  current_run->start();
+                }
+                client.println("HTTP/1.1 302 Found");
+                client.println("Location: /");
+                client.println("Connection: close");
+                client.println();
+                return;
             } else if (request.indexOf("GET /run/stop") >= 0) {
             	message = "Not implemented";            	
+            } else if (request.indexOf("GET /run/fetch") >= 0) {
+              if (current_run->active) {
+                client.println("HTTP/1.1 202 Accepted");
+                client.println("Content-type: text/plain");
+                client.println("Connection: close");
+                client.println(); 
+              } else {
+                client.println("HTTP/1.1 200 OK");
+                client.println("Content-type: text/plain");
+                client.println("Connection: close");
+                client.println(); 
+                for (uint8_t i = 0; i < current_run->num_measurements; i++) { 
+                    if (current_run->m[i].is_valid) {
+                        client.println(current_run->run_name + "," + i + "," + current_run->m[i].value);
+                    } else {
+                        client.println("NA,NA,NA");
+                    }
+                }             
+              }
+
+              return;
             }
 
             client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
+            client.println("Content-type: text/html");
             client.println("Connection: close");
             client.println();
             Serial.println("[process_http] Returning document to client");
@@ -65,12 +104,15 @@ void process_http(WiFiServer *server, Run *current_run) {
             client.println("<p>" + message + "</p>");
             uint8_t i = (current_run->idx == 0) ? 0 : current_run->idx - 1;
             client.print("<p><h1>");
-            if (current_run->m[i].is_valid) {
-              client.print(current_run->m[i].value);
-            } else {
-              client.print("(no valid value)");
+            for (i = 0; i < current_run->num_measurements; i++) { 
+                if (current_run->m[i].is_valid) {
+                    client.print(current_run->m[i].value); client.print("<br />");
+                } else {
+                    client.print("(no valid value)"); client.print("<br />");
+                }
             }
             client.println("</h1></p>");
+            client.println(current_run->num_measurements);
 //            client.println("<p><a href=\"/calibrate/1\"><button class=\"button\">Calibrate - Ref1</button></a></p>");
 //            client.println("<p><a href=\"/calibrate/2\"><button class=\"button\">Calibrate - Ref2</button></a></p>");
 //            client.println("<p><a href=\"/measure\"><button class=\"button\">Take measurement</button></a></p>");

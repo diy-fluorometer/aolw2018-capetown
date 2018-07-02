@@ -6,7 +6,7 @@
 // Apparently, dynamic allocation of memory is no bueno in the Arduino world,
 // so let's fix the maximum number of measurements per run.
 
-#define MAX_MEASUREMENTS 1
+#define MAX_MEASUREMENTS 20
 
 class Run {
   
@@ -15,6 +15,7 @@ class Run {
     String run_name = String("default");
     boolean active = false;
     Measurement m[MAX_MEASUREMENTS];
+    uint8_t num_measurements = 0;
     uint8_t idx = 0;
     
     void reset_measurements() {
@@ -23,7 +24,18 @@ class Run {
       }
     }
     
+    void start(uint8_t n, String nm) {
+      if (num_measurements <= MAX_MEASUREMENTS) {
+          num_measurements = n;
+          run_name = nm;
+          reset_measurements();
+          active = true;
+      }
+    }
+
     void start() {
+      num_measurements = 1;
+      run_name = String("default");
       reset_measurements();
       active = true;
     }

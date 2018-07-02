@@ -103,7 +103,7 @@ long repCount = 0;
 void take_measurement() {
   uint32_t timestamp;
 
-  if (current_run.idx >= MAX_MEASUREMENTS) {
+  if (current_run.idx >= current_run.num_measurements) {
 #if DEBUG
     Serial.println("Done taking measurements");
 #endif

@@ -1,0 +1,48 @@
+---
+title: "v5"
+author: "Lisa Thalheim"
+date: "June 26, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+
+## OpenFluoro v5 evaluation
+
+```{r read-data-gg}
+file <- "../data/v5/TextMarker_1.csv"
+ds1 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds1_med <- ds1 %>% filter(gain == "MED")
+ds1_w <- ds1 %>% filter(name == "water") %>% select(value)
+ds1_wm <- median(ds1_w$value)
+file <- "../data/v5/TextMarker_2.csv"
+ds2 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds2_med <- ds2 %>% filter(gain == "MED")
+file <- "../data/v5/TextMarker_3.csv"
+ds3 <- read.csv(file,
+              header = TRUE,
+              sep = ",",
+              comment.char = "#")
+ds3_med <- ds3 %>% filter(gain == "MED")
+ds3_w <- ds3 %>% filter(name == "water") %>% select(value)
+ds3_wm <- median(ds3_w$value)
+ggplot() + 
+  geom_boxplot(data = ds1_med, mapping = aes(x = name, y = value - ds1_wm, color = "TM1")) +
+  geom_boxplot(data = ds3_med, mapping = aes(x = name, y = value - ds3_wm, color = "TM3")) +
+  scale_x_discrete(limits = c("emptybox", "emptytube", "water", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13", "S14", "S15", "S16")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+
