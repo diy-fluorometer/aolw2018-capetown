@@ -8,10 +8,7 @@
 
 #include "FluoroMeasurement.h"
 #include "FluoroRun.h"
-#include "FluoroHttp.h"
 #include "FluoroDevice.h"
-
-#include <ESP8266WiFi.h>
 
 // When using Arduino Uno:
 // connect SCL to analog 5
@@ -26,50 +23,60 @@
 // GND to GND
 
 #define DEBUG 1
+#define BAIL_ON_ERROR(x) { if (x == ERR_NO_SENSOR || x == ERR_INVALID_PARAMETER) { return MSRMT_ERROR; } }
+#define MAX_MEASUREMENTS 500 // sanity control, to prevent me from shooting myself in the foot
+
+// This code supports four modes for reading from the sensor:
+// - auto gain / fixed time
+// - auto time / fixed gain
+// - auto gain / auto time
+// - fixed gain / fixed time
+// 
+// The mode is set via commands over the serial interface.
+//
+// The serial commands are as follows:
+//
+// gain <auto|max|hi|med|lo>             -- configures the gain
+// time <auto|100|200|300|400|500|600>   -- configures the integration time
+// led <on|off|auto>                   -- controls the blue LED
+// read <n>                              -- takes n measurements, for uint16_t n
+//
+// Note: Manually controlling the light may not appear to make much sense, but I
+// wanted it during R&D to investigate and measure possible warming effects as well
+// as photobleaching.
+// 
+// the output format is one measurement per line:
+//   <i>,<value>,<gain>,<time>
+
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591); // pass in a number for the sensor identifier (for your use later)
 bool sensor_found = false;
 
 Run current_run;
 
 void configure_sensor(void);
-void display_sensor_details(void);
-int read_sensor(tsl2591Gain_t gain);
-int read_sensor();
-int32_t raw_read(uint8_t gain);
-void stop_measurement();
-void process_http();
+int32_t raw_read();
 void calibrate(uint8_t ref);
-const tsl2591IntegrationTime_t integrationTime = TSL2591_INTEGRATIONTIME_600MS; // longest integration time
+float read_auto_gain();
+float read_auto_time();
+float read_auto_gain_time();
 
-const char* ssid     = "Fluoro";
-const char* password = "VerySecure";
+bool isAutoGain = false;
+bool isAutoTime = false;
+bool isAutoLed  = true;
 
-// Set web server port number to 80
-WiFiServer server(80);
-
-// Variable to store the HTTP request
-boolean ap_running = false;
+uint32_t num_measurements = 0;
 
 void setup(void) 
 {
   Serial.begin(9600);
 
-  ap_running = WiFi.softAP(ssid, password);
-  // TODO actual error handling please
-  if (ap_running == true) {
-    Serial.println("AP running");
-    server.begin();
-  }
-  else {
-    Serial.println("Starting AP failed");
-  }
-
   if (tsl.begin()) {
     Serial.println("Found a TSL2591 sensor");
     sensor_found = true;
 
-    display_sensor_details();
-    configure_sensor();
+    // set the initial gain and integration time to default values
+    tsl.setGain(TSL2591_GAIN_MAX);
+    tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);
     
     pinMode(BLUE_LED_PIN, OUTPUT);
     digitalWrite(BLUE_LED_PIN, LOW);
@@ -86,50 +93,124 @@ bool led_status = 0;
 #define TSL2591_GMED_FACTOR    25
 #define TSL2591_GLOW_FACTOR     1
 
-bool doMeasure = false;
-String sampleName;
-long numRep = 0;
-long repCount = 0;
+void print_measurement(uint32_t i, float value) {
+  Serial.print(i); Serial.print(","); Serial.print(value); Serial.print(",");
+  switch (tsl.getGain()) {
+    case TSL2591_GAIN_LOW:
+      Serial.print("lo");
+      break;
+    case TSL2591_GAIN_MED:
+      Serial.print("med");
+      break;
+    case TSL2591_GAIN_HIGH:
+      Serial.print("hi");
+      break;
+    case TSL2591_GAIN_MAX:
+      Serial.print("max");
+      break;
+    default:
+      Serial.print("na");
+  }
+  Serial.print(",");
+  switch (tsl.getTiming()) {
+    case TSL2591_INTEGRATIONTIME_100MS:
+      Serial.print("100");
+      break;
+    case TSL2591_INTEGRATIONTIME_200MS:
+      Serial.print("200");
+      break;
+    case TSL2591_INTEGRATIONTIME_300MS:
+      Serial.print("300");
+      break;
+    case TSL2591_INTEGRATIONTIME_400MS:
+      Serial.print("400");
+      break;
+    case TSL2591_INTEGRATIONTIME_500MS:
+      Serial.print("500");
+      break;
+    case TSL2591_INTEGRATIONTIME_600MS:
+      Serial.print("600");
+      break;
+    default:
+      Serial.print("na");
+  }
+  Serial.println();
+}
 
-// Takes a measurement and returns a Measurement object with all the right
-// values filled in.
-// If there is an error, the Measurement object will have is_valid set to false and
-// its error field set to the appropriate error code.
-//
-// The routine runs through all four possible gain settings, from most sensitive
-// to least sensitive. This order makes sense in the context of fluorescence measurement,
-// since usually, there will be very little light to work with.
+void led_on() {
+  if (isAutoLed) {
+    digitalWrite(BLUE_LED_PIN, HIGH);
+  } else {
+    // do nothing - light control is on manual
+  }
+}
 
-void take_measurement() {
-  uint32_t timestamp;
-
-  if (current_run.idx >= current_run.num_measurements) {
-#if DEBUG
-    Serial.println("Done taking measurements");
-#endif
-    current_run.active = false;
-    current_run.idx = 0;
+void led_off() {
+  if (isAutoLed) {
     digitalWrite(BLUE_LED_PIN, LOW);
+  } else {
+    // do nothing - light control is on manual
+  }
+}
+
+#define MSRMT_ERROR -1.0
+
+void take_measurements(uint32_t num_measurements) {
+
+  // Simplest case: Fixed integration time and fixed gain.
+  if (!isAutoTime && !isAutoGain) {
+    led_on();
+    for (uint32_t i = 1; i <= num_measurements; i++) {
+      int32_t v = raw_read();
+      float value = Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+      print_measurement(i, value);
+    }
+    led_off();
     return;
   }
 
-#if DEBUG
-  Serial.print("Taking measurement #"); Serial.println(current_run.idx);
-#endif
+  // Fixed integration time, auto gain
 
-  // Turn on the blue light source
-  digitalWrite(BLUE_LED_PIN, HIGH);
-  
-  int32_t v = raw_read(TSL2591_GAIN_MAX);
-  timestamp = millis();
-  current_run.m[current_run.idx].timestamp = timestamp;
-  current_run.m[current_run.idx].value_max = v;
+  if (isAutoGain && !isAutoTime) {
+    led_on();
+    for (uint32_t i = 1; i <= num_measurements; i++) {
+      float value = read_auto_gain();
+      print_measurement(i, value);
+    }
+    led_off();
+    return;
+  }
+
+  // Fixed gain, auto integration time
+
+  if (!isAutoGain && isAutoTime) {
+    led_on();
+    for (uint32_t i = 1; i <= num_measurements; i++) {
+      float value = read_auto_time();
+      print_measurement(i, value);
+    }
+    led_off();
+    return;
+  }
+
+  // Auto gain, auto integration time
+
+  led_on();
+  for (uint32_t i = 1; i <= num_measurements; i++) {
+    float value = read_auto_gain_time();
+    print_measurement(i, value);
+  }
+  led_off(); 
+} 
+
+float read_auto_gain() {
+
+  tsl.setGain(TSL2591_GAIN_MAX);
+  int32_t v = raw_read();
   if (v < 0) {
     if (v == ERR_NO_SENSOR ||
         v == ERR_INVALID_PARAMETER) {
-      current_run.m[current_run.idx].is_valid = false;
-      current_run.idx++;
-      return;        
+      return MSRMT_ERROR;        
     } else {
 #if DEBUG
       Serial.println("Falling through from MAX to HIGH");
@@ -139,26 +220,18 @@ void take_measurement() {
   } else {
     // Good, we got a useable value.
 #if DEBUG
-    Serial.print("MAX: ");
-    Serial.println(v);
+    Serial.print("MAX: "); Serial.println(v);
 #endif
-    current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_MAX);
-    current_run.idx++;
-    return;
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
   }
 
 
-  v = raw_read(TSL2591_GAIN_HIGH);
-  timestamp = millis();
-  current_run.m[current_run.idx].timestamp = timestamp;
-  current_run.m[current_run.idx].value = v;
+  tsl.setGain(TSL2591_GAIN_HIGH);
+  v = raw_read();
   if (v < 0) {
     if (v == ERR_NO_SENSOR ||
         v == ERR_INVALID_PARAMETER) {
-      current_run.m[current_run.idx].is_valid = false;
-      current_run.idx++;
-      return;        
+      return MSRMT_ERROR;        
     } else {
 #if DEBUG
       Serial.println("Falling through from HIGH to MED");
@@ -169,25 +242,18 @@ void take_measurement() {
     // Good, we got a useable value.
     // Adjust it for gain factor so we end up with a single scale for all values.
 #if DEBUG
-    Serial.print("HIGH: "); Serial.print(v); Serial.print(" ");
+    Serial.print("HIGH: "); Serial.println(v);
 #endif
 
-    current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_HIGH);
-    current_run.idx++;
-    return;
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
   }
 
-  v = raw_read(TSL2591_GAIN_MED);
-  timestamp = millis();
-  current_run.m[current_run.idx].timestamp = timestamp;
-  current_run.m[current_run.idx].value = v;
+  tsl.setGain(TSL2591_GAIN_MED);
+  v = raw_read();
   if (v < 0) {
     if (v == ERR_NO_SENSOR ||
         v == ERR_INVALID_PARAMETER) {
-      current_run.m[current_run.idx].is_valid = false;
-      current_run.idx++;
-      return;        
+      return MSRMT_ERROR;        
     } else {
 #if DEBUG
       Serial.println("Falling through from MED to LOW");        
@@ -198,57 +264,169 @@ void take_measurement() {
     // Good, we got a useable value.
     // Adjust it for gain factor so we end up with a single scale for all values.
 #if DEBUG
-    Serial.print("MED: "); Serial.print(v); Serial.println(" ");
+    Serial.print("MED: "); Serial.println(v);
 #endif
 
-    current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_MED);
-    current_run.idx++;
-    return;
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
   }
 
-  v = raw_read(TSL2591_GAIN_LOW);
-  timestamp = millis();  
-  current_run.m[current_run.idx].timestamp = timestamp;
-  current_run.m[current_run.idx].value = v;
+  tsl.setGain(TSL2591_GAIN_LOW);
+  v = raw_read();
   if (v < 0) {
     if (v == ERR_NO_SENSOR ||
         v == ERR_INVALID_PARAMETER) {
-      current_run.m[current_run.idx].is_valid = false;
-      current_run.idx++;
-      return;        
+      return MSRMT_ERROR;        
     } else {
 #if DEBUG
       Serial.println("Already at low -> too much light");
 #endif
       // We are already at the lowest gain setting. If we still have an invalid value,
       // it likely means that there is too much light for our sensor.
-      current_run.m[current_run.idx].is_valid = false;
-      current_run.m[current_run.idx].value = ERR_OUT_OF_RANGE;
-      current_run.idx++;
-      return;
+      return ERR_OUT_OF_RANGE;
     }
   } else {
     // Good, we got a useable value.
     // Adjust it for gain factor so we end up with a single scale for all values.
 #if DEBUG
-    Serial.print("LOW: "); Serial.print(v); Serial.println(" ");
+    Serial.print("LOW: "); Serial.println(v);
 #endif
-   
-    current_run.m[current_run.idx].is_valid = true;
-    current_run.m[current_run.idx].value = Measurement::calculateLux(v, 0, integrationTime, TSL2591_GAIN_LOW);
-    current_run.idx++;
-    return;
-  }  
+
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  return MSRMT_ERROR; 
 }
 
-void loop(void) 
-{
-  process_http(&server, &current_run);
-  if (sensor_found) {
-    if (current_run.active) {
-      take_measurement();
+
+float read_auto_time() {
+  int32_t v;
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // Overflow. Fall through and try again with a different integration time.
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // Overflow. Fall through and try again with a different integration time.
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // Overflow. Fall through and try again with a different integration time.
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // Overflow. Fall through and try again with a different integration time.
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_200MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // Overflow. Fall through and try again with a different integration time.
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS);
+  v = raw_read();
+  if (v < 0) {
+    BAIL_ON_ERROR(v)
+
+    // We are already at the lowest integration time setting. If we still have
+    // an invalid value, it means that there is too much light for our
+    // sensor.
+    return ERR_OUT_OF_RANGE;
+  } else {     // Good, we got a useable value.
+    return Measurement::calculateLux(v, 0, tsl.getTiming(), tsl.getGain());
+  }
+
+  return MSRMT_ERROR; 
+}
+
+float read_auto_gain_time() {
+
+}
+
+void poll_serial_and_process() {
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    if (input.startsWith("read ")) {
+      uint32_t num_measurements = (uint32_t)input.substring(5).toInt();
+      num_measurements = num_measurements > MAX_MEASUREMENTS ? MAX_MEASUREMENTS : num_measurements;
+      take_measurements(num_measurements);
+    } else if (input.startsWith("info")) {
+      // TODO
+    } else if (input.equals("led on")) {
+      isAutoLed = false;
+      digitalWrite(BLUE_LED_PIN, HIGH);
+    } else if (input.equals("led off")) {
+      isAutoLed = false;
+      digitalWrite(BLUE_LED_PIN, LOW);
+    } else if (input.equals("led auto")) {
+      isAutoLed = true;
+    } else if (input.startsWith("gain ")) {
+      isAutoGain = false; 
+      String gain_str = input.substring(5);
+      if (gain_str.startsWith("lo")) {
+        tsl.setGain(TSL2591_GAIN_LOW);
+      } else if (gain_str.startsWith("me")) {
+        tsl.setGain(TSL2591_GAIN_MED);
+      } else if (gain_str.startsWith("hi")) {
+        tsl.setGain(TSL2591_GAIN_HIGH);
+      } else if (gain_str.startsWith("ma")) {
+        tsl.setGain(TSL2591_GAIN_MAX);
+      } else if (gain_str.startsWith("au")) {
+        isAutoGain = true; 
+      } 
+    } else if (input.startsWith("time ")) {
+      isAutoTime = false;
+      String time_str = input.substring(5);
+      if (time_str.startsWith("1")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS);
+      } else if (time_str.startsWith("2")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_200MS);
+      } else if (time_str.startsWith("3")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
+      } else if (time_str.startsWith("4")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
+      } else if (time_str.startsWith("5")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
+      } else if (time_str.startsWith("6")) {
+        tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);
+      } else if (time_str.startsWith("a")) {
+        isAutoTime = true;
+      } 
     }
+  }
+}
+
+void loop(void) {
+  if (sensor_found) {
+    poll_serial_and_process();
   } else {
     // If no sensor was found, just blink the LED to signal this
     digitalWrite(LED_BUILTIN, led_status);
@@ -257,35 +435,13 @@ void loop(void)
   }  
 }
 
-/**************************************************************************/
-/*
-    Displays some basic information on this sensor from the unified
-    sensor API sensor_t type (see Adafruit_Sensor for more information)
-*/
-/**************************************************************************/
-void display_sensor_details(void)
-{
-  sensor_t sensor;
-  tsl.getSensor(&sensor);
-  Serial.println("------------------------------------");
-  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" lux");
-  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" lux");
-  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" lux");  
-  Serial.println("------------------------------------");
-  Serial.println("");
-  delay(500);
-}
 
 /**************************************************************************/
 /*
     Configures the gain and integration time for the TSL2591
 */
 /**************************************************************************/
-void configure_sensor(void)
-{
+void configure_sensor() {
   // You can change the gain on the fly, to adapt to brighter/dimmer light situations
   //tsl.setGain(TSL2591_GAIN_LOW);    // 1x gain (bright light)
   //tsl.setGain(TSL2591_GAIN_MED);      // 25x gain
@@ -300,83 +456,17 @@ void configure_sensor(void)
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
   //tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
-  tsl.setTiming(integrationTime);  // longest integration time (dim light)
-
-  /* Display the gain and integration time for reference sake */  
-  //Serial.println("------------------------------------");
-  //Serial.print  ("Gain:         ");
-  tsl2591Gain_t gain = tsl.getGain();
-  switch(gain)
-  {
-    case TSL2591_GAIN_LOW:
-      //Serial.println("1x (Low)");
-      break;
-    case TSL2591_GAIN_MED:
-      //Serial.println("25x (Medium)");
-      break;
-    case TSL2591_GAIN_HIGH:
-      //Serial.println("428x (High)");
-      break;
-    case TSL2591_GAIN_MAX:
-      //Serial.println("9876x (Max)");
-      break;
-  }
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);
 }
 
-int read_sensor(tsl2591Gain_t gain)
-{
-  if (gain == TSL2591_GAIN_LOW ||
-      gain == TSL2591_GAIN_MED ||
-      gain == TSL2591_GAIN_HIGH ||
-      gain == TSL2591_GAIN_MAX) {
-    // if a valid value was given for gain, set it in the sensor before reading
-    tsl.setGain(gain);
-  } else {
-        // do nothing, just leave the gain as it is currently configured
-  }
-
-  return read_sensor();
-}
-
-int read_sensor() {
-  /* Get a new sensor event */
-  uint16_t lumi = tsl.getLuminosity(TSL2591_VISIBLE);
-  return lumi; 
-  sensors_event_t event;
-  tsl.getEvent(&event);
- 
-  if (//(event.light == 0) |
-      (event.light > 4294966000.0) | 
-      (event.light <-4294966000.0))
-  {
-    /* If event.light = 0 lux the sensor is probably saturated */
-    /* and no reliable data could be generated! */
-    /* if event.light is +/- 4294967040 there was a float over/underflow */
-    return -1;
-  }
-  else
-  {
-    return (int)event.light;
-  }
-}
-
-int32_t raw_read(uint8_t gain) {
+int32_t raw_read() {
   if (!sensor_found)
   {
     return -1;
   }
 
-  if ((gain != TSL2591_GAIN_LOW) &&
-      (gain != TSL2591_GAIN_MED) &&
-      (gain != TSL2591_GAIN_HIGH) &&
-      (gain != TSL2591_GAIN_MAX)) {
-    return -2;      
-  }
-
-  // Enable the device
   tsl.enable();
-
-  tsl.write8(TSL2591_COMMAND_BIT | TSL2591_REGISTER_CONTROL, tsl.getTiming() | gain);
+  tsl.write8(TSL2591_COMMAND_BIT | TSL2591_REGISTER_CONTROL, tsl.getTiming() | tsl.getGain());
 
   // Wait for ADC to complete
   for (uint8_t d = 0; d <= tsl.getTiming(); d++)
@@ -395,11 +485,4 @@ int32_t raw_read(uint8_t gain) {
   return x;
 }
 
-void stop_measurement() {
-  doMeasure = false;
-  sampleName = "";
-  numRep = 0;
-  repCount = 0;
-  digitalWrite(BLUE_LED_PIN, LOW);
-}
 
