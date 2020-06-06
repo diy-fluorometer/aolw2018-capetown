@@ -65,6 +65,9 @@ class Measurement {
       return 0;
     }
   
+    // TODO introduced this for debugging, change back
+    return (float)ch0;
+
     // Note: This algorithm is based on preliminary coefficients
     // provided by AMS and may need to be updated in the future
   
@@ -127,6 +130,74 @@ class Measurement {
     // Alternate lux calculation 2
     //lux = ( (float)ch0 - ( 1.7F * (float)ch1 ) ) / cpl;
   
+    // Signal I2C had no errors
+    return lux;
+  }
+
+    /**************************************************************************/
+  static float calculateLux(uint16_t ch0, tsl2591IntegrationTime_t _integration, tsl2591Gain_t _gain)
+  {
+    float    atime, again;
+    float    cpl, lux;  
+
+    // Check for overflow conditions first
+    if ((ch0 == 0xFFFF)) {
+      // Signal an overflow
+      return 0;
+    }
+  
+    // Note: This algorithm is based on preliminary coefficients
+    // provided by AMS and may need to be updated in the future
+  
+    switch (_integration)
+    {
+      case TSL2591_INTEGRATIONTIME_100MS :
+        atime = 100.0F;
+        break;
+      case TSL2591_INTEGRATIONTIME_200MS :
+        atime = 200.0F;
+        break;
+      case TSL2591_INTEGRATIONTIME_300MS :
+        atime = 300.0F;
+        break;
+      case TSL2591_INTEGRATIONTIME_400MS :
+        atime = 400.0F;
+        break;
+      case TSL2591_INTEGRATIONTIME_500MS :
+        atime = 500.0F;
+        break;
+      case TSL2591_INTEGRATIONTIME_600MS :
+        atime = 600.0F;
+        break;
+      default: // 100ms
+        atime = 100.0F;
+        break;
+    }
+  
+    switch (_gain)
+    {
+      case TSL2591_GAIN_LOW :
+        again = 1.0F;
+        break;
+      case TSL2591_GAIN_MED :
+        again = 25.0F;
+        break;
+      case TSL2591_GAIN_HIGH :
+        again = 428.0F;
+        break;
+      case TSL2591_GAIN_MAX :
+        again = 9876.0F;
+        break;
+      default:
+        again = 1.0F;
+        break;
+    }
+  
+    // cpl = (ATIME * AGAIN) / DF
+    cpl = (atime * again) / TSL2591_LUX_DF;
+
+    lux = (float)ch0 / cpl;
+
     // Signal I2C had no errors
     return lux;
   }

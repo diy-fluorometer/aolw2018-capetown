@@ -36,10 +36,13 @@
 //
 // The serial commands are as follows:
 //
-// gain <auto|max|hi|med|lo>             -- configures the gain
-// time <auto|100|200|300|400|500|600>   -- configures the integration time
-// led <on|off|auto>                   -- controls the blue LED
-// read <n>                              -- takes n measurements, for uint16_t n
+// gain <auto|max|hi|med|lo> -- configures the gain
+// time <auto|100|...|600>   -- configures the integration time
+// led <on|off|auto>         -- controls the blue LED. auto: the
+//                                          read command will switch on the LED
+//                                          before reading the value series and
+//                                          switch it off after
+// read <n>                  -- takes n measurements, for n < MAX_MEASUREMENTS
 //
 // Note: Manually controlling the light may not appear to make much sense, but I
 // wanted it during R&D to investigate and measure possible warming effects as well
@@ -48,7 +51,7 @@
 // the output format is one measurement per line:
 //   <i>,<value>,<gain>,<time>
 
-Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591); // pass in a number for the sensor identifier (for your use later)
+Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
 bool sensor_found = false;
 
 Run current_run;
@@ -374,6 +377,8 @@ float read_auto_gain_time() {
 void poll_serial_and_process() {
   if (Serial.available()) {
     String input = Serial.readStringUntil('\n');
+    Serial.println("[ok] " + input); // echo command back as feedback
+
     if (input.startsWith("read ")) {
       uint32_t num_measurements = (uint32_t)input.substring(5).toInt();
       num_measurements = num_measurements > MAX_MEASUREMENTS ? MAX_MEASUREMENTS : num_measurements;
